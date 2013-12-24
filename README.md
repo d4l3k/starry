@@ -41,10 +41,14 @@ go run starry.go
 
 Pretty Pictures
 ------
-
+Join/Leave Message
 ![Join Messages](http://i.imgur.com/jePE5aH.png)
+
+Interactice CLI
+![CLI](http://i.imgur.com/ZKP9OHM.png)
 
 License
 -----
 The code is free to use and licensed under the MIT License.
+
 Copyright (c) 2013 Tristan Rice
