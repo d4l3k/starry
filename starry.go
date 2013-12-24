@@ -276,6 +276,26 @@ func cli() {
                 fmt.Println("Invalid syntax.")
                 printWTF()
             }
+        } else if command == "kick" {
+            if len(parts)>1 {
+                //bans = append(bans, Ban{parts[1],"None"})
+                name := strings.Join(parts[1:]," ")
+                for i:=0; i< len(connections);i++ {
+                    conn := connections[i]
+                    addr_bits := strings.Split(conn.RemoteAddr.String(),":")
+                    addr := strings.Join(addr_bits[:len(addr_bits)-1],":")
+                    if conn.Name == name {
+                        fmt.Println("[Kicked] Name:", conn.Name, "IP:", addr)
+                        conn.Conn.Close()
+                        conn.ProxyConn.Close()
+                    } else if strings.Index(conn.Name, name)!=-1 {
+                        fmt.Println("Did you mean:",conn.Name,"( IP:", addr, ")")
+                    }
+                }
+            } else {
+                fmt.Println("Invalid syntax.")
+                printWTF()
+            }
         } else if command == "say" {
             message := strings.Join(parts[2:]," ")
             say(parts[1], message)
@@ -316,6 +336,7 @@ func printHelp() {
 	fmt.Println("    banip <ip> [<name/desc>]\n      - Ban a player by IP. You can ban subnets by omitting the end of a address. Ex: 'ban 8.8.8.'")
 	fmt.Println("    unban <name/desc>\n      - Unban a IP by name or description.")
 	fmt.Println("    unbanip <ip>\n      - Unban a player by IP.")
+	fmt.Println("    kick <name>\n      - Kick a currently connected player.")
 }
 func printWTF() {
 	fmt.Println("Type 'help' for more information.")
