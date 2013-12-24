@@ -24,7 +24,12 @@ Starry is written in Go(lang) which is availible in most Linux distributions. Us
 Use
 ------
 
-Modify `starbound.config` in your linux64(/32) folder and change `gamePort` to be 21024, or whatever port you would like. You should then modify your firewall to block this port. Alternatively, if you're selectively port-forwarding ports, don't port forward 21024.
+Modify `starbound.config` in your linux64(/32) folder and change `gamePort` to be 21024, or whatever port you would like. You should then modify your firewall to block this port. Alternatively, if you're selectively port-forwarding ports, don't port forward 21024. 
+
+On Linux you can do this by running:
+```
+sudo iptables -A INPUT -p tcp --destination-port 21024 -j DROP
+```
 
 Modify `starry.config` to your prefered values.
 ```
