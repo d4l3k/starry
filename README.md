@@ -3,6 +3,20 @@ Starry
 
 A starbound server manager with an API for remote administration.
 
+Features
+-----
+* Interactive CLI
+* Ban players by IP or IP range.
+* Player Join/Leave messages (see pictures below).
+* Send messages from console.
+* View logs
+* Server restart on crash
+
+Future
+-----
+* `/command` commands.
+* Remote control via web.
+
 Needed Software
 -----
 Starry is written in Go(lang) which is availible in most Linux distributions. Use your package manager to install it.
@@ -24,3 +38,8 @@ To launch it:
 ```bash
 go run starry.go
 ```
+
+Pretty Pictures
+------
+
+![Join Messages](http://i.imgur.com/jePE5aH.png)
