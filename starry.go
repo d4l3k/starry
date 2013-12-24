@@ -33,20 +33,31 @@ func netProxy(connections chan Client) {
 		panic(err)
 	}
 	for {
-		conn, err := listener.Accept()
+		conn, _ := listener.Accept()
 		//fmt.Println("Server listerning")
-		rConn, err := net.DialTCP("tcp", nil, rAddr)
-		if err != nil {
-			fmt.Println("\n[Error] Client tried to connect. Server is not accepting connections.")
-			conn.Close()
-		} else {
-			fmt.Println("\nRemote addr:", rConn.LocalAddr())
-			connections <- Client{"Unknown", -1, conn.RemoteAddr(), rConn.LocalAddr(), conn, rConn}
-			go io.Copy(conn, rConn)
-			go io.Copy(rConn, conn)
-			defer rConn.Close()
-		}
-		defer conn.Close()
+        banned := false
+        for i:=0;i<len(bans);i++ {
+            ban := bans[i]
+            if(strings.Index(conn.RemoteAddr().String(), ban.Addr)!=-1){
+                fmt.Println("[Info] Banned client tried to connect from IP:",conn.RemoteAddr().String(),"Matched Rule Name:",ban.Name,"Rule IP:",ban.Addr)
+                banned = true
+                conn.Close()
+            }
+        }
+        if !banned {
+            rConn, err := net.DialTCP("tcp", nil, rAddr)
+            if err != nil {
+                fmt.Println("[Error] Client tried to connect. Server is not accepting connections.")
+                conn.Close()
+            } else {
+                fmt.Println("Remote addr:", rConn.LocalAddr())
+                connections <- Client{"Unknown", -1, conn.RemoteAddr(), rConn.LocalAddr(), conn, rConn}
+                go io.Copy(conn, rConn)
+                go io.Copy(rConn, conn)
+                defer rConn.Close()
+            }
+            defer conn.Close()
+        }
 	}
 }
 
@@ -150,6 +161,16 @@ func cli() {
                 }
                 fmt.Println("[Banned] ip:",parts[1], "Desc:", desc)
                 bans = append(bans, Ban{parts[1],desc})
+                for i:=0; i< len(connections);i++ {
+                    conn := connections[i]
+                    addr_bits := strings.Split(conn.RemoteAddr.String(),":")
+                    addr := strings.Join(addr_bits[:len(addr_bits)-1],":")
+                    if strings.Index(addr, parts[1])!=-1 {
+                        fmt.Println("[Kicked] Name:", conn.Name, "IP:", addr)
+                        conn.Conn.Close()
+                        conn.ProxyConn.Close()
+                    }
+                }
                 writeConfig()
             } else {
                 fmt.Println("Invalid syntax.")
@@ -241,7 +262,7 @@ func printHelp() {
 	fmt.Println("    log [<count>]\n      - Display the last <count> server messages. <count> defaults to 20.")
 	fmt.Println("  Banning:")
     fmt.Println("    bans\n      - List all banned players and IPs.")
-	fmt.Println("    ban <name>\n      - Ban a currently connected player's IP by name. WIP")
+	fmt.Println("    ban <name>\n      - Ban a currently connected player's IP by name.")
 	fmt.Println("    banip <ip> [<name/desc>]\n      - Ban a player by IP. You can ban subnets by omitting the end of a address. Ex: 'ban 8.8.8.'")
 	fmt.Println("    unban <name/desc>\n      - Unban a IP by name or description.")
 	fmt.Println("    unbanip <ip>\n      - Unban a player by IP.")
