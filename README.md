@@ -43,3 +43,8 @@ Pretty Pictures
 ------
 
 ![Join Messages](http://i.imgur.com/jePE5aH.png)
+
+License
+-----
+The code is free to use and licensed under the MIT License.
+Copyright (c) 2013 Tristan Rice
