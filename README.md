@@ -48,8 +48,8 @@ go run starry.go
 
 Pretty Pictures
 ------
-Join/Leave Message
-![Join Messages](http://i.imgur.com/jePE5aH.png)
+Join/Leave messages and chatting from console:
+![Join Messages](http://i.imgur.com/2TFCuEv.png)
 
 Interactice CLI
 ![CLI](http://i.imgur.com/ZKP9OHM.png)

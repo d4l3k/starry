@@ -23,47 +23,61 @@ type Client struct {
 	RemoteAddr, LocalAddr net.Addr
 	Conn, ProxyConn       net.Conn
 }
-
+func sayTo(connection Client, sender, message string){
+    for len(message)>0 {
+        end := 55 -len(sender)
+        if len(message)<end {
+            end = len(message)
+        }
+        n_message := message[:end]
+        if len(message)>= end {
+            message = message[end:]
+        }
+        length := len(sender) + len(n_message) + 8
+        // Normal text (what looks like a player)
+        //encoded := []byte{0x05, byte(length * 2), 0x01, 0x00, 0x00, 0x00, 0x00, 0x02}
+        encoded := []byte{0x05, byte(length * 2), 0x03, 0x00, 0x00, 0x00, 0x00, 0x00}
+        encoded = append(encoded, byte(len(sender)))
+        encoded = append(encoded, []byte(sender)...)
+        encoded = append(encoded, byte(len(n_message)))
+        encoded = append(encoded, []byte(n_message)...)
+        encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
+        connection.Conn.Write(encoded)
+        sender = ""
+    }
+}
 func say(sender, message string) {
-	// 0000   05 4e 01 00 00 00 00 02 0a 57 61 74 65 72 73 61  .N.......Watersa
-	// 0010   76 65 72 15 48 69 20 74 68 65 72 65 21 20 49 20  ver.Hi there! I
-	// 0020   61 6d 20 61 20 64 75 63 6b 30 04 98 6d 2b 0c 60  am a duck0..m+.`
-	// 0030   04 02 8d c2 5a                                   ....Z
-	//encoded := []byte{0x05, 0x26, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01}
-	length := len(sender) + len(message) + 8
-	encoded := []byte{0x05, byte(length * 2), 0x01, 0x00, 0x00, 0x00, 0x00, 0x02}
-	encoded = append(encoded, byte(len(sender)))
-	encoded = append(encoded, []byte(sender)...)
-	encoded = append(encoded, byte(len(message)))
-	encoded = append(encoded, []byte(message)...)
-	//encoded = append(encoded, []byte{0x30, 0x04, 0x86, 0x77, 0x2b, 0x0c, 0x5c, 0x04, 0x02, 0x8d, 0xac, 0x7e}...)
-	encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
-	for i := 0; i < len(connections); i++ {
+    for i := 0; i < len(connections); i++ {
 		conn := connections[i]
-		conn.Conn.Write(encoded)
+		//conn.Conn.Write(encoded)
+        sayTo(conn, sender, message)
 	}
 }
-func broadcast(sender, message string) {
-	/*
-	   0000   05 44 03 00 00 00 00 00 06 73 65 72 76 65 72 14  .D.......server.
-	   0010   4e 6f 20 73 75 63 68 20 63 6f 6d 6d 61 6e 64 20  No such command
-	   0020   62 6c 61 68 0c 4c 25 00 23 01 07 03 06 72 65 73  blah.L%.#....res
-	   0030   75 6c 74 01 02 69 64 04 b2 5e 07 63 6f 6d 6d 61  ult..id..^.comma
-	   0040   6e 64 05 08 72 65 73 70 6f 6e 73 65              nd..response
-	*/
-	//sender := "Console"
-	length := len(sender) + len(message) + 8
-	encoded := []byte{0x05, byte(length * 2), 0x03, 0x00, 0x00, 0x00, 0x00, 0x00}
-	encoded = append(encoded, byte(len(sender)))
-	encoded = append(encoded, []byte(sender)...)
-	encoded = append(encoded, byte(len(message)))
-	encoded = append(encoded, []byte(message)...)
-	//encoded = append(encoded, []byte{0x30, 0x04, 0x86, 0x77, 0x2b, 0x0c, 0x5c, 0x04, 0x02, 0x8d, 0xac, 0x7e}...)
-	encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
-	//encoded = append(encoded, []byte{0x0c, 0x4c, 0x25, 0x00, 0x23, 0x01, 0x07, 0x03, 0x06, 0x72, 0x65, 0x73, 0x75, 0x6c, 0x74, 0x01, 0x02, 0x69, 0x64, 0x04, 0xb2, 0x5e, 0x07, 0x63, 0x6f, 0x6d, 0x6d, 0x61, 0x6e, 0x64, 0x05, 0x08, 0x72, 0x65, 0x73, 0x70, 0x6f, 0x6e, 0x73, 0x65}...)
+func sendConsole(connection Client, message string){
+    sender := ""
+    for len(message)>0 {
+        end := 55
+        if len(message)<end {
+            end = len(message)
+        }
+        n_message := message[:end]
+        if len(message)>= end {
+            message = message[end:]
+        }
+        length := len(sender) + len(n_message) + 8
+        encoded := []byte{0x05, byte(length * 2), 0x03, 0x00, 0x00, 0x00, 0x00, 0x00}
+        encoded = append(encoded, byte(len(sender)))
+        encoded = append(encoded, []byte(sender)...)
+        encoded = append(encoded, byte(len(n_message)))
+        encoded = append(encoded, []byte(n_message)...)
+        encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
+        connection.Conn.Write(encoded)
+    }
+}
+func broadcast(message string) {
 	for i := 0; i < len(connections); i++ {
 		conn := connections[i]
-		conn.Conn.Write(encoded)
+        sendConsole(conn, message)
 	}
 }
 func netProxy(connections chan Client) {
@@ -305,8 +319,8 @@ func cli() {
 			message := strings.Join(parts[2:], " ")
 			say(parts[1], message)
 		} else if command == "broadcast" {
-			message := strings.Join(parts[2:], " ")
-			broadcast(parts[1], message)
+			message := strings.Join(parts[1:], " ")
+			broadcast(message)
 		} else if command == "clients" {
 			fmt.Println("[Clients]")
 			for i := 0; i < len(connections); i++ {
@@ -327,12 +341,51 @@ func cli() {
 		}
 	}
 }
+
+type Command struct {
+    Command, Fields, Description, Category string
+    Auth bool
+}
+
+var commands []Command
+func genHelp() (lines []string) {
+    lines = append(lines, "[Commands]")
+    categories := make([]string, 0)
+    for i:=0;i<len(commands);i++ {
+        command := commands[i]
+        found := false
+        for j:=0;j<len(categories);j++ {
+            if categories[j]==command.Category {
+                found = true
+                break
+            }
+        }
+        if !found {
+            categories = append(categories, command.Category)
+        }
+    }
+    for i:=0;i<len(categories);i++ {
+        category := categories[i]
+        lines = append(lines, category+":")
+        for i:=0;i<len(commands);i++ {
+            command := commands[i]
+            lines = append(lines, "  "+command.Command+" "+command.Fields)
+            lines = append(lines, "    "+command.Description)
+        }
+    }
+    return
+}
 func printHelp() {
-	fmt.Println("[Commands]")
+    lines := genHelp()
+    for i:=0;i<len(lines);i++ {
+        fmt.Println(lines[i])
+    }
+    /*
+    fmt.Println("[Commands]")
 	fmt.Println("  General:")
 	fmt.Println("    clients\n      - Display connected clients.")
-	fmt.Println("    say <sender name> <message>\n      - Send a message to all connected players. WIP")
-	fmt.Println("    broadcast <sender name> <message>\n      - Send a message to all connected players in grey text. If the message + sender length is > 55, it will disconnect the client. WIP")
+	fmt.Println("    say <sender name> <message>\n      - Send a message to all connected players.")
+	fmt.Println("    broadcast <message>\n      - Send a message to all connected players in grey text.")
 	fmt.Println("    help\n      - This message.")
 	fmt.Println("    log [<count>]\n      - Display the last <count> server messages. <count> defaults to 20.")
 	fmt.Println("  Banning:")
@@ -342,6 +395,7 @@ func printHelp() {
 	fmt.Println("    unban <name/desc>\n      - Unban a IP by name or description.")
 	fmt.Println("    unbanip <ip>\n      - Unban a player by IP.")
 	fmt.Println("    kick <name>\n      - Kick a currently connected player.")
+    */
 }
 func printWTF() {
 	fmt.Println("Type 'help' for more information.")
@@ -393,6 +447,18 @@ func readConfig() {
 }
 
 func main() {
+    commands = []Command{
+        Command{ "clients", "", "Display connected clients.", "General", false },
+        Command{ "say", "<sender name> <message>", "Say something.", "General", true },
+        Command{ "broadcast", "<message>", "Show grey text in chat.", "General", true },
+        Command{ "help", "", "This message", "General", false },
+        Command{ "log", "[<count>]", "Last <count> or 20 log messages.", "General", true },
+        Command{ "bans", "", "Show ban list.", "Bans", true },
+        Command{ "ban", "<name>", "Ban an IP by player name.", "Bans", true },
+        Command{ "banip", "<ip> [<name>]", "Ban an IP or range (eg. 8.8.8.).", "Bans", true },
+        Command{ "unban", "<name>", "Unban an IP by name.", "Bans", true },
+        Command{ "unbanip", "<ip>", "Unban an IP.", "Bans", true },
+    }
 	readConfig()
 	clientChan := make(chan Client)
 	go netProxy(clientChan)
@@ -427,7 +493,7 @@ func main() {
 								connections[i].Name = name
 								connections[i].Id = id
 								fmt.Println("[Client]", connections[i])
-								broadcast("Console", connections[i].Name+" has joined.")
+								broadcast(connections[i].Name+" has joined.")
 							}
 						}
 					} else if op == "disconnected" {
@@ -436,7 +502,7 @@ func main() {
 						id, _ := strconv.Atoi(id_str)
 						for i := 0; i < len(connections); i++ {
 							if connections[i].Id == id {
-								broadcast("Console", connections[i].Name+" has left.")
+								broadcast(connections[i].Name+" has left.")
 								connections = append(connections[:i], connections[i+1:]...)
 								break
 							}
