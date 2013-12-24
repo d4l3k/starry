@@ -155,7 +155,7 @@ func printMessages(count int) {
 	if count == 0 {
 		count = 20
 	}
-	path := "/home/rice/.starbound/linux64/starbound_server.log"
+	path := serverPath+".log"
 	file, err := os.Open(path)
 	if err != nil {
 		fmt.Println("Failed to read log file:", path)
