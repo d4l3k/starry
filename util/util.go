@@ -1,11 +1,10 @@
 package util
 
 import (
-    "os"
-    "bufio"
-    "fmt"
+	"bufio"
+	"fmt"
+	"os"
 )
-
 
 func ReadLines(path string) ([]string, error) {
 	file, err := os.Open(path)

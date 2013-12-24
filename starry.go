@@ -1,6 +1,7 @@
 package main
 
 import (
+	"./util"
 	"bufio"
 	"encoding/json"
 	"fmt"
@@ -11,7 +12,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-    "./util"
 )
 
 var serverAddress string = "localhost:21024"
@@ -157,19 +157,17 @@ func printMessages(count int) {
 		count = 20
 	}
 	path := logFile
-    if len(path)==0 {
-        path := serverPath + ".log"
-    }
-	file, err := os.Open(path)
-	if err != nil {
-		fmt.Println("Failed to read log file:", path)
+	if len(path) == 0 {
+		path = serverPath
+		if path[len(path)-4:] == ".exe" {
+			path = path[:len(path)-4]
+		}
+		path += ".log"
 	}
-	defer file.Close()
 
-	var lines []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		lines = append(lines, scanner.Text())
+	lines, err := util.ReadLines(path)
+	if err != nil {
+		fmt.Println("[Error] Failed to read log file:", err, "Path:", path)
 	}
 	if count > len(lines) {
 		count = len(lines)
@@ -386,14 +384,13 @@ func readConfig() {
 			fmt.Println("[Error]", err)
 		} else {
 			serverPath = config.ServerPath
-            logFile = config.LogFile
+			logFile = config.LogFile
 			serverAddress = config.ServerAddress
 			proxyAddress = config.ProxyAddress
 			bans = config.Bans
 		}
 	}
 }
-
 
 func main() {
 	readConfig()
