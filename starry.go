@@ -10,10 +10,11 @@ import (
 	"strconv"
 	"strings"
 	"time"
+    "encoding/json"
 )
 
-var remoteAddr string = "localhost:21024"
-
+var serverAddress string = "localhost:21024"
+var proxyAddress string = "0.0.0.0:21025"
 type Client struct {
 	Name                  string
 	Id                    int
@@ -22,13 +23,12 @@ type Client struct {
 }
 
 func netProxy(connections chan Client) {
-	service := "0.0.0.0:21025"
-	tcpAddr, err := net.ResolveTCPAddr("tcp", service)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", proxyAddress)
 	checkError(err)
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err)
 
-	rAddr, err := net.ResolveTCPAddr("tcp", remoteAddr)
+	rAddr, err := net.ResolveTCPAddr("tcp", serverAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -54,11 +54,11 @@ type ServerInfo struct {
 	Type, Data string
 }
 
-var prog string = "/home/rice/.starbound/linux64/starbound_server"
+var serverPath string = "/home/rice/.starbound/linux64/starbound_server"
 
 func monitorServer(cs chan ServerInfo) {
 	for {
-		cmd := exec.Command(prog)
+		cmd := exec.Command(serverPath)
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			fmt.Println(err)
@@ -136,11 +136,87 @@ func cli() {
 		command := parts[0]
 		if command == "help" {
 			printHelp()
-		} else if command == "clients" {
-			fmt.Println("Clients:")
+		} else if command == "bans" {
+			fmt.Println("[Bans]")
+			for i := 0; i < len(bans); i++ {
+				conn := bans[i]
+				fmt.Println("  Name:", conn.Name, "IP:", conn.Addr)
+			}
+        } else if command == "banip" {
+            if len(parts)>1 {
+                desc := "None"
+                if len(parts)>2 {
+                    desc = strings.Join(parts[2:]," ")
+                }
+                fmt.Println("[Banned] ip:",parts[1], "Desc:", desc)
+                bans = append(bans, Ban{parts[1],desc})
+                writeConfig()
+            } else {
+                fmt.Println("Invalid syntax.")
+                printWTF()
+            }
+        } else if command == "unbanip" {
+            if len(parts)>1 {
+                //bans = append(bans, Ban{parts[1],"None"})
+                for i:=0; i< len(bans);i++ {
+                    if bans[i].Addr == parts[1]{
+                        conn := bans[i]
+                        fmt.Println("[Unbanned] Name:", conn.Name, "IP:", conn.Addr)
+                        bans = append(bans[:i],bans[i+1:]...)
+                        writeConfig()
+                    } else if strings.Index(bans[i].Addr, parts[1])!=-1 {
+                        fmt.Println("Did you mean:",bans[i].Name,"instead? ( IP:", bans[i].Addr, ")")
+                    }
+                }
+            } else {
+                fmt.Println("Invalid syntax.")
+                printWTF()
+            }
+        } else if command == "ban" {
+            if len(parts)>1 {
+                //bans = append(bans, Ban{parts[1],"None"})
+                name := strings.Join(parts[1:]," ")
+                for i:=0; i< len(connections);i++ {
+                    conn := connections[i]
+                    addr_bits := strings.Split(conn.RemoteAddr.String(),":")
+                    addr := strings.Join(addr_bits[:len(addr_bits)-1],":")
+                    if conn.Name == name {
+                        fmt.Println("[Banned] Name:", conn.Name, "IP:", addr)
+                        bans = append(bans, Ban{addr, conn.Name})
+                        conn.Conn.Close()
+                        conn.ProxyConn.Close()
+                        writeConfig()
+                        //bans = append(bans[:i],bans[i+1:]...)
+                    } else if strings.Index(conn.Name, name)!=-1 {
+                        fmt.Println("Did you mean:",conn.Name,"( IP:", addr, ")")
+                    }
+                }
+            } else {
+                fmt.Println("Invalid syntax.")
+                printWTF()
+            }
+        } else if command == "unban" {
+            if len(parts)>1 {
+                //bans = append(bans, Ban{parts[1],"None"})
+                name := strings.Join(parts[1:]," ")
+                for i:=0; i< len(bans);i++ {
+                    if strings.Index(bans[i].Name, name)!=-1 {
+                        conn := bans[i]
+                        fmt.Println("[Unbanned] Name:", conn.Name, "IP:", conn.Addr)
+                        bans = append(bans[:i],bans[i+1:]...)
+                        writeConfig()
+                        break
+                    }
+                }
+            } else {
+                fmt.Println("Invalid syntax.")
+                printWTF()
+            }
+        } else if command == "clients" {
+			fmt.Println("[Clients]")
 			for i := 0; i < len(connections); i++ {
 				conn := connections[i]
-				fmt.Println(conn.Name, "- ID:", conn.Id, "IP:", conn.RemoteAddr)
+				fmt.Println(" ",conn.Name, "- ID:", conn.Id, "IP:", conn.RemoteAddr)
 			}
 		} else if command == "log" {
 			count := 20
@@ -149,30 +225,104 @@ func cli() {
 			}
 			printMessages(count)
 		} else {
-			fmt.Println("Unknown command:", command)
+            if len(command) > 0{
+                fmt.Println("Unknown command:", command)
+            }
 			printWTF()
 		}
 	}
 }
 func printHelp() {
-	fmt.Println("Commands:")
-	fmt.Println("ban <name>     - Ban a player's IP by name.")
-	fmt.Println("bans           - List all banned players and IPs.")
-	fmt.Println("banip <ip>     - Ban a player by IP.")
-	fmt.Println("broadcast      - Broadcast a message.")
-	fmt.Println("clients        - Display connected clients.")
-	fmt.Println("help           - This message.")
-	fmt.Println("log [<count>]    - Display the last <count> server messages. <count> defaults to 20.")
-	fmt.Println("unban <name>   - Unban a player's IP by name.")
-	fmt.Println("unbanip <ip>   - Unban a player by IP.")
+	fmt.Println("[Commands]")
+    fmt.Println("  General:")
+	fmt.Println("    clients\n      - Display connected clients.")
+	fmt.Println("    broadcast\n      - Send a message to all connected players. WIP")
+	fmt.Println("    help\n      - This message.")
+	fmt.Println("    log [<count>]\n      - Display the last <count> server messages. <count> defaults to 20.")
+	fmt.Println("  Banning:")
+    fmt.Println("    bans\n      - List all banned players and IPs.")
+	fmt.Println("    ban <name>\n      - Ban a currently connected player's IP by name. WIP")
+	fmt.Println("    banip <ip> [<name/desc>]\n      - Ban a player by IP. You can ban subnets by omitting the end of a address. Ex: 'ban 8.8.8.'")
+	fmt.Println("    unban <name/desc>\n      - Unban a IP by name or description.")
+	fmt.Println("    unbanip <ip>\n      - Unban a player by IP.")
 }
 func printWTF() {
 	fmt.Println("Type 'help' for more information.")
 }
 
+type Ban struct {
+    Addr, Name string
+}
+
+var bans        []Ban
 var connections []Client
 
+type Config struct {
+    ServerPath string
+    ServerAddress string
+    ProxyAddress string
+    Bans []Ban
+}
+
+func writeConfig() {
+    config := Config{serverPath, serverAddress, proxyAddress, bans}
+    b, err := json.MarshalIndent(config, "", "    ")
+    if err != nil {
+        fmt.Println("[Error] Failed to create JSON config.")
+    }
+    writeLines([]string{string(b)},"starry.config")
+}
+func readConfig() {
+    lines, err := readLines("starry.config")
+    if err!=nil {
+        fmt.Println("[Error]",err)
+        writeConfig()
+    } else {
+        var config Config
+        err := json.Unmarshal([]byte(strings.Join(lines,"\n")),&config)
+        if err!=nil {
+            fmt.Println("[Error]",err)
+        } else {
+            serverPath = config.ServerPath
+            serverAddress = config.ServerAddress
+            proxyAddress = config.ProxyAddress
+            bans = config.Bans
+        }
+    }
+}
+
+func readLines(path string) ([]string, error) {
+  file, err := os.Open(path)
+  if err != nil {
+    return nil, err
+  }
+  defer file.Close()
+
+  var lines []string
+  scanner := bufio.NewScanner(file)
+  for scanner.Scan() {
+    lines = append(lines, scanner.Text())
+  }
+  return lines, scanner.Err()
+}
+
+// writeLines writes the lines to the given file.
+func writeLines(lines []string, path string) error {
+  file, err := os.Create(path)
+  if err != nil {
+    return err
+  }
+  defer file.Close()
+
+  w := bufio.NewWriter(file)
+  for _, line := range lines {
+    fmt.Fprintln(w, line)
+  }
+  return w.Flush()
+}
+
 func main() {
+    readConfig()
 	clientChan := make(chan Client)
 	go netProxy(clientChan)
 	serverChan := make(chan ServerInfo)
@@ -214,7 +364,7 @@ func main() {
 						id, _ := strconv.Atoi(id_str)
 						for i := 0; i < len(connections); i++ {
 							if connections[i].Id == id {
-							    connections = append(connections[:i]...,connections[i+1:]...)
+							    connections = append(connections[:i],connections[i+1:]...)
                                 break
                             }
 						}
