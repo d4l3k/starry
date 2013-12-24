@@ -12,10 +12,10 @@ Features
 * View logs
 * Server restart on crash
 * Works on Linux and Windows (not tested)
+* `/command` commands. The syntax is mostly the same as the CLI but you need to put the server password as the first argument for most commands. Eg. `/ban Password1 Billy`. See `/help` for more information.
 
 Future
 -----
-* `/command` commands.
 * Remote control via web.
 
 Needed Software
@@ -38,6 +38,7 @@ ServerPath: You should modify "gamePort" in the starbound.config file in the Ser
 LogFile: This is the path to the log file location. If you leave this blank it will append ".log" to the ServerPath.
 ServerAddress: Address that the Starbound server can be connected to at. 
 ProxyAddress: The address that Starry binds to. This should probably be left as is.
+Password: A password for remote admin access.
 Bans: Leave this as is unless you know what you are doing. This is used by Starry to save the bans.
 ```
 
