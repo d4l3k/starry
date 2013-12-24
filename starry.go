@@ -175,6 +175,21 @@ func printMessages(count int) {
 	}
 	//return lines, scanner.Err()
 }
+func banip(ip, desc string){
+    fmt.Println("[Banned] ip:",ip, "Desc:", desc)
+    bans = append(bans, Ban{ip,desc})
+    for i:=0; i< len(connections);i++ {
+        conn := connections[i]
+        addr_bits := strings.Split(conn.RemoteAddr.String(),":")
+        addr := strings.Join(addr_bits[:len(addr_bits)-1],":")
+        if strings.Index(addr, ip)!=-1 {
+            fmt.Println("[Kicked] Name:", conn.Name, "IP:", addr)
+            conn.Conn.Close()
+            conn.ProxyConn.Close()
+        }
+    }
+    writeConfig()
+}
 func cli() {
 	fmt.Println("Starry CLI - Welcome to Starry!")
 	fmt.Println("Starry is a command line Starbound and remote access administration tool.")
@@ -200,19 +215,7 @@ func cli() {
                 if len(parts)>2 {
                     desc = strings.Join(parts[2:]," ")
                 }
-                fmt.Println("[Banned] ip:",parts[1], "Desc:", desc)
-                bans = append(bans, Ban{parts[1],desc})
-                for i:=0; i< len(connections);i++ {
-                    conn := connections[i]
-                    addr_bits := strings.Split(conn.RemoteAddr.String(),":")
-                    addr := strings.Join(addr_bits[:len(addr_bits)-1],":")
-                    if strings.Index(addr, parts[1])!=-1 {
-                        fmt.Println("[Kicked] Name:", conn.Name, "IP:", addr)
-                        conn.Conn.Close()
-                        conn.ProxyConn.Close()
-                    }
-                }
-                writeConfig()
+                banip(parts[1],desc)
             } else {
                 fmt.Println("Invalid syntax.")
                 printWTF()
@@ -325,7 +328,7 @@ func printHelp() {
     fmt.Println("  General:")
 	fmt.Println("    clients\n      - Display connected clients.")
 	fmt.Println("    say <sender name> <message>\n      - Send a message to all connected players. WIP")
-	fmt.Println("    broadcast <sender name> <message>\n      - Send a message to all connected players in grey text. If message is too long, it will disconnect the client.")
+	fmt.Println("    broadcast <sender name> <message>\n      - Send a message to all connected players in grey text. If the message + sender length is > 55, it will disconnect the client. WIP")
 	fmt.Println("    help\n      - This message.")
 	fmt.Println("    log [<count>]\n      - Display the last <count> server messages. <count> defaults to 20.")
 	fmt.Println("  Banning:")
