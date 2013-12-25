@@ -1,7 +1,7 @@
 Starry
 ======
 
-A starbound server manager that adds ingame commands, item giving, banning and a couple of other features.
+A starbound server proxy that adds ingame commands, item giving, banning and a couple of other features. It is compariable to Project Starlight or Starrybound.
 
 Source is on GitHub and has the most upto date information: https://github.com/d4l3k/starry
 
@@ -14,7 +14,7 @@ Features
 * View logs
 * Server restart on crash
 * Works on Linux and Windows (not tested)
-* `/command` commands. The syntax is the same as the CLI but you need to be on the admin list. Eg. `/ban Password1 Billy`. See `/help` for more information.
+* `/command` commands. The syntax is the same as the CLI but you need to be on the admin list.
 * Give players items.
 * Admin chat highlighting.
 * Server MOTD
