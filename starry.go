@@ -768,6 +768,11 @@ func readConfig() {
 	}
 }
 
+func (client Client) delayWelcome() {
+    time.Sleep(time.Second)
+    client.MOTD()
+}
+
 func main() {
 	commands = []Command{
 		Command{"clients", "", "Connected client information (UUID, IP).", "General", true},
@@ -818,8 +823,12 @@ func main() {
 							addr := connections[i].LocalAddr.String()
 							//fmt.Println("NPath:", addr, "Path:", path, addr == path)
 							if addr == path {
-                                connections[i].MOTD()
-								broadcast(connections[i].Name + " has joined.", 0x02)
+                                go connections[i].delayWelcome()
+                                for j:=0; j<len(connections); j++ {
+                                    if i!=j {
+								        connections[j].Message("", connections[i].Name + " has joined.", 0x02)
+                                    }
+                                }
 							}
 						}
 					}
