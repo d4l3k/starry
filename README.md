@@ -116,9 +116,9 @@ ServerPath: You should modify "gamePort" in the starbound.config file in the Ser
 LogFile: This is the path to the log file location. If you leave this blank it will append ".log" to the ServerPath.
 ServerAddress: Address that the Starbound server can be connected to at. 
 ProxyAddress: The address that Starry binds to. This should probably be left as is.
-Password: A password for remote admin access.
+Password: A password for remote admin access. Not used ATM. Will be used for the web interface.
 MOTD: A message to display to users upon connection. Leave blank to disable.
-Admins: A list of admins. Can be added to using 'addadmin' and 'deladmin'. The only thing "admin" status gives you is green text in chat.
+Admins: A list of admins. Can be added to using 'addadmin' and 'deladmin'.
 Bans: Leave this as is unless you know what you are doing. This is used by Starry to save the bans.
 ```
 
