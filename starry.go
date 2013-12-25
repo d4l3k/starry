@@ -26,27 +26,7 @@ type Client struct {
 }
 
 func (connection Client) Say(sender, message string) {
-	for len(message) > 0 {
-		end := 55 - len(sender)
-		if len(message) < end {
-			end = len(message)
-		}
-		n_message := message[:end]
-		if len(message) >= end {
-			message = message[end:]
-		}
-		length := len(sender) + len(n_message) + 8
-		// Normal text (what looks like a player)
-		//encoded := []byte{0x05, byte(length * 2), 0x01, 0x00, 0x00, 0x00, 0x00, 0x02}
-		encoded := []byte{0x05, byte(length * 2), 0x03, 0x00, 0x00, 0x00, 0x00, 0x00}
-		encoded = append(encoded, byte(len(sender)))
-		encoded = append(encoded, []byte(sender)...)
-		encoded = append(encoded, byte(len(n_message)))
-		encoded = append(encoded, []byte(n_message)...)
-		encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
-		connection.Conn.Write(encoded)
-		sender = ""
-	}
+    connection.Message(sender, message, 0x01)
 }
 func say(sender, message string) {
 	for i := 0; i < len(connections); i++ {
@@ -85,10 +65,17 @@ func giveItem(name, item string, count int) (lines []string) {
     }
     return
 }
-func (connection Client) Console(message string) {
-	sender := ""
+/*
+Colors: 
+    0x00 - Green
+    0x01 - Yellow
+    0x02 - Brick
+    0x03 - Gray
+    All others - Light gray
+*/
+func (connection Client) Message(sender, message string, color byte) {
 	for len(message) > 0 {
-		end := 55
+		end := 55 - len(sender)
 		if len(message) < end {
 			end = len(message)
 		}
@@ -97,19 +84,25 @@ func (connection Client) Console(message string) {
 			message = message[end:]
 		}
 		length := len(sender) + len(n_message) + 8
-		encoded := []byte{0x05, byte(length * 2), 0x03, 0x00, 0x00, 0x00, 0x00, 0x00}
+		// Normal text (what looks like a player)
+		//encoded := []byte{0x05, byte(length * 2), 0x01, 0x00, 0x00, 0x00, 0x00, 0x02}
+		encoded := []byte{0x05, byte(length * 2), color, 0x00, 0x00, 0x00, 0x00, 0x00}
 		encoded = append(encoded, byte(len(sender)))
 		encoded = append(encoded, []byte(sender)...)
 		encoded = append(encoded, byte(len(n_message)))
 		encoded = append(encoded, []byte(n_message)...)
 		encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
 		connection.Conn.Write(encoded)
+		sender = ""
 	}
 }
-func broadcast(message string) {
+func (connection Client) Console(message string) {
+    connection.Message("", message, 0x04)
+}
+func broadcast(message string, color byte) {
 	for i := 0; i < len(connections); i++ {
 		conn := connections[i]
-		conn.Console(message)
+		conn.Message("", message, color)
 	}
 }
 func filterConn(dst, src net.Conn) (written int64, err error){
@@ -117,14 +110,21 @@ func filterConn(dst, src net.Conn) (written int64, err error){
     for {
         nr, er := src.Read(buf)
         if nr > 0 {
-            //if buf[0] == 0x05 {
-            //index := bytes.Index(buf, []byte{0x05, 0x52, 0x03})
-            //if index!=-1 {
+            // Drops the "No command found" response message from starbound_server
             if buf[0]==0x05 && buf[2]==0x03 && bytes.Index(buf,[]byte("No such command"))!=-1 {
                 length := 16 + int(buf[15])
-                //fmt.Println("Dropping message. Length:", length, buf[:length])
                 buf = buf[length:]
                 nr -= length
+            }
+            // Admin chat highlighting
+            if buf[0]==0x05 && buf[2]==0x01 {
+                length := buf[8]
+                name := string(buf[9:9+length])
+                for i:=0;i<len(admins);i++ {
+                    if admins[i] == name {
+                        buf[2]=0x00
+                    }
+                }
             }
             nw, ew := dst.Write(buf[0:nr])
             if nw > 0 {
@@ -273,7 +273,7 @@ func banip(ip, desc string) (lines []string) {
 		addr := strings.Join(addr_bits[:len(addr_bits)-1], ":")
 		if strings.Index(addr, ip) != -1 {
 			lines = append(lines, "[Banned] Name: "+conn.Name+" IP: "+addr)
-			broadcast(conn.Name + " has been banned.")
+			broadcast(conn.Name + " has been banned.", 0x02)
 			conn.Conn.Close()
 			conn.ProxyConn.Close()
 		}
@@ -312,7 +312,18 @@ func processCommand(command string, args []string, ingame bool) (response []stri
                 }
             }
         }
-	} else if command == "bans" {
+	} else if command == "color" {
+        if len(args)>1 {
+            msg := strings.Join(args[1:], " ")
+            color, _ := strconv.Atoi(args[0])
+            for i:=0; i<len(connections); i++ {
+                connections[i].Message("", msg, byte(color))
+            }
+        } else {
+			response = append(response, "Invalid syntax.")
+			response = append(response, printWTF())
+        }
+    } else if command == "bans" {
 		response = append(response, "[Bans]")
 		for i := 0; i < len(bans); i++ {
 			conn := bans[i]
@@ -356,7 +367,7 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 				if conn.Name == name {
 					response = append(response, "[Banned] Name: "+conn.Name+", IP: "+addr)
 					bans = append(bans, Ban{addr, conn.Name})
-					broadcast(conn.Name + " has been banned.")
+					broadcast(conn.Name + " has been banned.", 0x02)
 					conn.Conn.Close()
 					conn.ProxyConn.Close()
 					writeConfig()
@@ -395,7 +406,7 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 				addr := strings.Join(addr_bits[:len(addr_bits)-1], ":")
 				if conn.Name == name {
 					response = append(response, "[Kicked] Name: "+conn.Name+", IP: "+addr)
-					broadcast(conn.Name + " has been kicked.")
+					broadcast(conn.Name + " has been kicked.",0x02)
 					conn.Conn.Close()
 					conn.ProxyConn.Close()
 				} else if strings.Index(conn.Name, name) != -1 {
@@ -419,14 +430,39 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 		say(args[0], message)
 	} else if command == "broadcast" {
 		message := strings.Join(args, " ")
-		broadcast(message)
+		broadcast(message, 0x02)
 	} else if command == "clients" {
 		response = append(response, "[Clients]")
 		for i := 0; i < len(connections); i++ {
 			conn := connections[i]
 			response = append(response, "  "+conn.Name+" - ID: "+strconv.Itoa(conn.Id)+", IP: "+conn.RemoteAddr.String())
 		}
-	} else if command == "log" {
+	} else if command == "admins" {
+		response = append(response, "[Admins]")
+        response = append(response, strings.Join(admins, ", "))
+	} else if command == "addadmin" {
+        if len(args) == 1 {
+			response = append(response, "Added "+args[0]+" to the admin list.")
+            admins = append(admins, args[0])
+            writeConfig()
+        } else {
+			response = append(response, "Invalid syntax.")
+			response = append(response, printWTF())
+        }
+    } else if command == "deladmin" {
+        if len(args) == 1 {
+            for i:=0; i< len(admins); i++ {
+                if admins[i] == args[0] {
+                    response = append(response, "Removed "+args[0]+" from the admin list.")
+                    admins = append(admins[:i], admins[(i+1):]...)
+                    writeConfig()
+                }
+            }
+        } else {
+			response = append(response, "Invalid syntax.")
+			response = append(response, printWTF())
+        }
+    } else if command == "log" {
 		count := 20
 		if len(args) == 1 {
 			count, _ = strconv.Atoi(args[0])
@@ -523,13 +559,15 @@ type Config struct {
 	ServerAddress string
 	ProxyAddress  string
 	Password      string
+    Admins        []string
 	Bans          []Ban
 }
 
+var admins []string = []string{}
 var password string = "changethis"
 
 func writeConfig() {
-	config := Config{serverPath, logFile, serverAddress, proxyAddress, password, bans}
+	config := Config{serverPath, logFile, serverAddress, proxyAddress, password, admins, bans}
 	b, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		fmt.Println("[Error] Failed to create JSON config.")
@@ -562,6 +600,7 @@ func main() {
 		Command{"clients", "", "Display connected clients.", "General", false},
 		Command{"say", "<sender name> <message>", "Say something.", "General", true},
 		Command{"broadcast", "<message>", "Show grey text in chat.", "General", true},
+		Command{"color", "<color> <message>", "Similar to broadcast but with color.", "General", true},
 		Command{"help", "[<command>]", "Information on commands.", "General", false},
 		Command{"log", "[<count>]", "Last <count> or 20 log messages.", "General", true},
 		Command{"nick", "<name>", "Change your character's name. In game only.", "General", false},
@@ -571,6 +610,9 @@ func main() {
 		Command{"banip", "<ip> [<name>]", "Ban an IP or range (eg. 8.8.8.).", "Bans", true},
 		Command{"unban", "<name>", "Unban an IP by name.", "Bans", true},
 		Command{"unbanip", "<ip>", "Unban an IP.", "Bans", true},
+		Command{"admins", "", "Lists the admins.", "Admin", true},
+		Command{"addadmin", "<name>", "Adds a player to the admin list.", "Admin", true},
+		Command{"deladmin", "<name>", "Removes a player from the admin list.", "Admin", true},
 	}
 	readConfig()
 	clientChan := make(chan Client)
@@ -605,7 +647,7 @@ func main() {
 								connections[i].Name = name
 								connections[i].Id = id
 								fmt.Println("[Client]", connections[i])
-								broadcast(connections[i].Name + " has joined.")
+								broadcast(connections[i].Name + " has joined.", 0x02)
 							}
 						}
 					} else if op == "disconnected" {
@@ -614,7 +656,7 @@ func main() {
 						id, _ := strconv.Atoi(id_str)
 						for i := 0; i < len(connections); i++ {
 							if connections[i].Id == id {
-								broadcast(connections[i].Name + " has left.")
+								broadcast(connections[i].Name + " has left.", 0x02)
 								connections = append(connections[:i], connections[i+1:]...)
 								break
 							}
