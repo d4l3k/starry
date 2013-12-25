@@ -19,6 +19,7 @@ Features
 * Admin chat highlighting.
 * Server MOTD
 * UUID Admins
+* Loaded world monitoring `worlds`
 
 Pretty Pictures
 ------
@@ -45,47 +46,49 @@ Starry CLI - Welcome to Starry!
 Starry is a command line Starbound and remote access administration tool.
 > help
 [Commands]
-General:
+<General>
   clients 
-    Connected client information (UUID, IP).
+    - Connected client information (UUID, IP).
   players 
-    Show online players
+    - Show online players
   say <sender name> <message>
-    Say something.
+    - Say something.
   broadcast <message>
-    Show grey text in chat.
+    - Show grey text in chat.
   color <color> <message>
-    Similar to broadcast but with color.
+    - Similar to broadcast but with color.
   help [<command>]
-    Information on commands.
+    - Information on commands.
   log [<count>]
-    Last <count> or 20 log messages.
+    - Last <count> or 20 log messages.
   nick <name>
-    Change your character's name. In game only.
+    - Change your character's name. In game only.
   item <name> <item> <count>
-    Give items to a player
+    - Give items to a player
   motd 
-    View the MOTD
+    - View the MOTD
   setmotd <message>
-    Sets the MOTD
-Bans:
+    - Sets the MOTD
+  worlds 
+    - List loaded worlds.
+<Bans>
   bans 
-    Show ban list.
+    - Show ban list.
   ban <name>
-    Ban an IP by player name.
+    - Ban an IP by player name.
   banip <ip> [<name>]
-    Ban an IP or range (eg. 8.8.8.).
+    - Ban an IP or range (eg. 8.8.8.).
   unban <name>
-    Unban an IP by name.
+    - Unban an IP by name.
   unbanip <ip>
-    Unban an IP.
-Admin:
+    - Unban an IP.
+<Admin>
   admins 
-    Lists the admins.
+    - Lists the admins.
   adminadd <name>
-    Adds a player to the admin list.
+    - Adds a player to the admin list.
   adminrem <name>
-    Removes a player from the admin list.
+    - Removes a player from the admin list.
 ```
 
 Future

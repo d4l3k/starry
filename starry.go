@@ -309,7 +309,13 @@ func monitorServer(cs chan ServerInfo) {
 					cs <- ServerInfo{"chat", trim}
 				} else if strings.Index(trim, "Info: TcpServer") == 0 {
 					cs <- ServerInfo{"serverup", trim}
-				}
+				} else if strings.Index(trim, "Info: Shutting down world ") == 0 {
+                    parts := strings.Split(strings.TrimRight(trim, " ")," ")
+                    cs <- ServerInfo{"worlddown", parts[len(parts)-1]}
+                } else if strings.Index(trim, "Info: Loading world db for world ") == 0 || strings.Index(trim, "Info: Creating world ") == 0 {
+                    parts := strings.Split(strings.TrimRight(trim, " ")," ")
+                    cs <- ServerInfo{"worldup", parts[len(parts)-1]}
+                }
 			}
 		}
 		cmd.Wait()
@@ -338,7 +344,7 @@ func printMessages(count int) (lines []string) {
 	if count > len(logs) {
 		count = len(logs)
 	}
-	lines = append(lines, "Last "+strconv.Itoa(count), " log messages (of "+strconv.Itoa(len(lines))+"):")
+	lines = append(lines, "Last "+strconv.Itoa(count) + " log messages (of "+strconv.Itoa(len(logs))+"):")
 	for i := 0; i < count; i++ {
 		line := len(logs) - count + i
 		lines = append(lines, logs[line])
@@ -539,6 +545,11 @@ func processCommand(command string, args []string, client *Client) (response []s
             //response = append(response, "  "+conn.Name+" - UUID: "+conn.Uuid+", IP: "+conn.RemoteAddr.String())
 		}
         response = append(response,strings.Join(players,", "))
+	} else if command == "worlds" {
+		response = append(response, "[Worlds]")
+        for i:=0;i<len(worlds);i++ {
+            response = append(response, worlds[i])
+        }
 	} else if command == "admins" {
 		response = append(response, "[Admins]")
         admins := make([]string, 0)
@@ -654,7 +665,7 @@ func genHelp(ingame bool) (lines []string) {
 	}
 	for i := 0; i < len(categories); i++ {
 		category := categories[i]
-		lines = append(lines, category+":")
+		lines = append(lines, "<"+category+">")
 		for i := 0; i < len(commands); i++ {
 			command := commands[i]
             if command.Category == category {
@@ -665,7 +676,7 @@ func genHelp(ingame bool) (lines []string) {
                 msg += command.Command + " "
                 lines = append(lines, msg+command.Fields)
                 if !ingame {
-                    lines = append(lines, "    "+command.Description)
+                    lines = append(lines, "    - "+command.Description)
                 }
             }
 		}
@@ -698,6 +709,7 @@ type Config struct {
 type User struct {
     Name, Uuid string
 }
+var worlds []string
 var config Config
 //var admins []string = []string{}
 //var motd string = "Welcome to Starry!"
@@ -757,6 +769,7 @@ func main() {
 		Command{"item", "<name> <item> <count>", "Give items to a player", "General", true},
 		Command{"motd", "", "View the MOTD", "General", false},
 		Command{"setmotd", "<message>", "Sets the MOTD", "General", true},
+		Command{"worlds", "", "List loaded worlds.", "General", false},
 		Command{"bans", "", "Show ban list.", "Bans", true},
 		Command{"ban", "<name>", "Ban an IP by player name.", "Bans", true},
 		Command{"banip", "<ip> [<name>]", "Ban an IP or range (eg. 8.8.8.).", "Bans", true},
@@ -822,7 +835,18 @@ func main() {
 							}
 						}
 					}
-				} else {
+				} else if info.Type == "worldup" {
+                    worlds = append(worlds, info.Data)
+                    fmt.Println("[World] Up: "+info.Data)
+                } else if info.Type == "worlddown" {
+                    fmt.Println("[World] Down: "+info.Data)
+                    for i:=0;i<len(worlds);i++ {
+                        if worlds[i] == info.Data {
+                            worlds = append(worlds[:i],worlds[i+1:]...)
+                        }
+                    }
+                    //worlds = append(worlds, info.Data)
+                } else {
 					fmt.Println("[ServerMon] Info:", info.Type, "Data:", info.Data)
 				}
 			}
