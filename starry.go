@@ -225,7 +225,6 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
     broadcast(client.Name + " has left.", 0x02)
     for i := 0; i < len(connections); i++ {
         if connections[i] == client {
-            broadcast(connections[i].Name + " has left.", 0x02)
             connections = append(connections[:i], connections[i+1:]...)
             break
         }
