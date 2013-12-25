@@ -82,6 +82,10 @@ Needed Software
 -----
 Starry is written in Go(lang) which is availible in most Linux distributions. Use your package manager to install it.
 
+Links to downloads are provided here for Windows, Mac OSX and other Linux distributions:
+
+http://golang.org/doc/install
+
 Use
 ------
 
