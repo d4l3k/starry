@@ -154,49 +154,13 @@ func filterConn(dst, src net.Conn) (written int64, err error){
 }
 func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err error){
     buf := make([]byte, 32*1024)
-
-    /*parts := strings.Split(info.Data, " ")
-    op := parts[len(parts)-1]
-    if op == "connected" {
-        path := parts[len(parts)-2]
-        path = path[1 : len(path)-1]
-        id_str := parts[len(parts)-3]
-        id_str = id_str[1 : len(id_str)-1]
-        id, _ := strconv.Atoi(id_str)
-        name := strings.Join(parts[2:len(parts)-3], " ")
-        name = name[1 : len(name)-1]
-        //fmt.Println("Path", path, "Name", name)
-        for i := 0; i < len(connections); i++ {
-            addr := connections[i].LocalAddr.String()
-            //fmt.Println("NPath:", addr, "Path:", path, addr == path)
-            if addr == path {
-                connections[i].Name = name
-                connections[i].Id = id
-                fmt.Println("[Client]", connections[i])
-                connections[i].MOTD()
-                broadcast(connections[i].Name + " has joined.", 0x02)
-            }
-        }
-    } else if op == "disconnected" {
-        id_str := parts[len(parts)-3]
-        id_str = id_str[1 : len(id_str)-1]
-        id, _ := strconv.Atoi(id_str)
-        for i := 0; i < len(connections); i++ {
-            if connections[i].Id == id {
-                broadcast(connections[i].Name + " has left.", 0x02)
-                connections = append(connections[:i], connections[i+1:]...)
-                break
-            }
-        }
-
-    }*/
     first := true
     var client Client
     for {
         nr, er := src.Read(buf)
         if nr > 0 {
             if first {
-                fmt.Println("First length:",nr, buf[0:20])
+                //fmt.Println("First length:",nr, buf[0:20])
                 length := byte(0)
                 cur := byte(0)
                 i := 1
@@ -205,7 +169,7 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                     length = length << 7 | (cur & 0x7f)
                     fmt.Println("L",length)
                 }
-                fmt.Println("Length",length)
+                //fmt.Println("Length",length)
                 comp := bytes.NewBuffer(buf[i:])
                 r, err := zlib.NewReader(comp)
                 if err!=nil {
@@ -221,15 +185,15 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                 unk := uncomp[index]
                 index += 1
                 uuid := hex.EncodeToString(uncomp[index:index+16])
-                fmt.Println("UUID", uuid)
-                fmt.Println("Uncomp",uncomp[index+16:150])
+                //fmt.Println("UUID", uuid)
+                //fmt.Println("Uncomp",uncomp[index+16:150])
                 index += 16
                 _ = asset_digest
                 _ = claim
                 _ = unk
                 index += 1
                 name := string(uncomp[index:index+uncomp[index-1]])
-                fmt.Println("Name",name)
+                //fmt.Println("Name",name)
                 client = Client{name, uuid, src.RemoteAddr(), dst.LocalAddr(), src, dst}
                 //client.MOTD()
                 fmt.Println("[Client]", client)
@@ -428,7 +392,11 @@ func processCommand(command string, args []string, client *Client) (response []s
             for i := 0; i < len(commands); i++ {
                 cmd := commands[i]
                 if cmd.Command == args[0] {
-                    msg := "/" + cmd.Command + " "
+                    msg := ""
+                    if ingame {
+                        msg += "/"
+                    }
+                    msg += cmd.Command + " "
                     if cmd.Auth && ingame {
                         msg += "<pass> "
                     }
@@ -695,9 +663,6 @@ func genHelp(ingame bool) (lines []string) {
                     msg += "/"
                 }
                 msg += command.Command + " "
-                if command.Auth && ingame {
-                    msg += "<pass> "
-                }
                 lines = append(lines, msg+command.Fields)
                 if !ingame {
                     lines = append(lines, "    "+command.Description)

@@ -14,10 +14,11 @@ Features
 * View logs
 * Server restart on crash
 * Works on Linux and Windows (not tested)
-* `/command` commands. The syntax is mostly the same as the CLI but you need to put the server password as the first argument for most commands. Eg. `/ban Password1 Billy`. See `/help` for more information.
+* `/command` commands. The syntax is the same as the CLI but you need to be on the admin list. Eg. `/ban Password1 Billy`. See `/help` for more information.
 * Give players items.
 * Admin chat highlighting.
 * Server MOTD
+* UUID Admins
 
 Pretty Pictures
 ------
@@ -42,7 +43,9 @@ Starry is a command line Starbound and remote access administration tool.
 [Commands]
 General:
   clients 
-    Display connected clients.
+    Connected client information (UUID, IP).
+  players 
+    Show online players
   say <sender name> <message>
     Say something.
   broadcast <message>
@@ -75,9 +78,9 @@ Bans:
 Admin:
   admins 
     Lists the admins.
-  addadmin <name>
+  adminadd <name>
     Adds a player to the admin list.
-  deladmin <name>
+  adminrem <name>
     Removes a player from the admin list.
 ```
 
