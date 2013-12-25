@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+    "bytes"
 )
 
 var serverAddress string = "localhost:21024"
@@ -54,6 +55,17 @@ func say(sender, message string) {
 		conn.Say(sender, message)
 	}
 }
+func genMsg(sender, msg string) []byte {
+    n_message := msg
+    length := len(sender) + len(n_message) + 8
+    encoded := []byte{0x05, byte(length * 2), 0x03, 0x00, 0x00, 0x00, 0x00, 0x00}
+    encoded = append(encoded, byte(len(sender)))
+    encoded = append(encoded, []byte(sender)...)
+    encoded = append(encoded, byte(len(n_message)))
+    encoded = append(encoded, []byte(n_message)...)
+    encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
+    return encoded
+}
 func (connection Client) Console(message string) {
 	sender := ""
 	for len(message) > 0 {
@@ -80,6 +92,43 @@ func broadcast(message string) {
 		conn := connections[i]
 		conn.Console(message)
 	}
+}
+func filterConn(dst, src net.Conn) (written int64, err error){
+    buf := make([]byte, 32*1024)
+    for {
+        nr, er := src.Read(buf)
+        if nr > 0 {
+            //if buf[0] == 0x05 {
+            //index := bytes.Index(buf, []byte{0x05, 0x52, 0x03})
+            //if index!=-1 {
+            if buf[0]==0x05 && buf[2]==0x03 && bytes.Index(buf,[]byte("No such command"))!=-1 {
+                length := 16 + int(buf[15])
+                //fmt.Println("Dropping message. Length:", length, buf[:length])
+                buf = buf[length:]
+                nr -= length
+            }
+            nw, ew := dst.Write(buf[0:nr])
+            if nw > 0 {
+                written += int64(nw)
+            }
+            if ew != nil {
+                err = ew
+                break
+            }
+            if nr != nw {
+                err = io.ErrShortWrite
+                break
+            }
+        }
+        if er == io.EOF {
+            break
+        }
+        if er != nil {
+            err = er
+            break
+        }
+    }
+    return
 }
 func netProxy(connections chan Client) {
 	tcpAddr, err := net.ResolveTCPAddr("tcp", proxyAddress)
@@ -111,8 +160,9 @@ func netProxy(connections chan Client) {
 			} else {
 				fmt.Println("Remote addr:", rConn.LocalAddr())
 				connections <- Client{"Unknown", -1, conn.RemoteAddr(), rConn.LocalAddr(), conn, rConn}
-				go io.Copy(conn, rConn)
+				go filterConn(conn, rConn)
 				go io.Copy(rConn, conn)
+                //go io.Copy(rConn, conn)
 				defer rConn.Close()
 			}
 			defer conn.Close()
@@ -487,6 +537,7 @@ func main() {
 		Command{"broadcast", "<message>", "Show grey text in chat.", "General", true},
 		Command{"help", "[<command>]", "Information on commands.", "General", false},
 		Command{"log", "[<count>]", "Last <count> or 20 log messages.", "General", true},
+		Command{"nick", "<name", "Change your character's name. In game only.", "General", false},
 		Command{"bans", "", "Show ban list.", "Bans", true},
 		Command{"ban", "<name>", "Ban an IP by player name.", "Bans", true},
 		Command{"banip", "<ip> [<name>]", "Ban an IP or range (eg. 8.8.8.).", "Bans", true},

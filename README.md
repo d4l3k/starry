@@ -14,6 +14,39 @@ Features
 * Works on Linux and Windows (not tested)
 * `/command` commands. The syntax is mostly the same as the CLI but you need to put the server password as the first argument for most commands. Eg. `/ban Password1 Billy`. See `/help` for more information.
 
+Commands
+-----
+```
+Starry CLI - Welcome to Starry!
+Starry is a command line Starbound and remote access administration tool.
+> help
+[Commands]
+General:
+  clients 
+    Display connected clients.
+  say <sender name> <message>
+    Say something.
+  broadcast <message>
+    Show grey text in chat.
+  help [<command>]
+    Information on commands.
+  log [<count>]
+    Last <count> or 20 log messages.
+  nick <name
+    Change your character's name. In game only.
+Bans:
+  bans 
+    Show ban list.
+  ban <name>
+    Ban an IP by player name.
+  banip <ip> [<name>]
+    Ban an IP or range (eg. 8.8.8.).
+  unban <name>
+    Unban an IP by name.
+  unbanip <ip>
+    Unban an IP.
+```
+
 Future
 -----
 * Remote control via web.
@@ -52,8 +85,11 @@ Pretty Pictures
 Join/Leave messages and chatting from console:
 ![Join Messages](http://i.imgur.com/2TFCuEv.png)
 
-Interactice CLI
+Interactice CLI:
 ![CLI](http://i.imgur.com/ZKP9OHM.png)
+
+Ingame commands:
+![Ingame](http://i.imgur.com/OJ9fEye.png)
 
 License
 -----
