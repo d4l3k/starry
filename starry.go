@@ -314,7 +314,7 @@ func monitorServer(cs chan ServerInfo) {
 				fmt.Println(err)
 				break
 			} else {
-				trim := strings.TrimRight(string(line), "\n")
+				trim := strings.Trim(string(line), "\n \r")
 				if strings.Index(trim, "Info: Client ") == 0 {
 					cs <- ServerInfo{"client", trim}
 				} else if strings.Index(trim, "Info:  <") == 0 {
@@ -325,7 +325,7 @@ func monitorServer(cs chan ServerInfo) {
                     parts := strings.Split(strings.TrimRight(trim, " ")," ")
                     cs <- ServerInfo{"worlddown", parts[len(parts)-1]}
                 } else if strings.Index(trim, "Info: Loading world db for world ") == 0 || strings.Index(trim, "Info: Creating world ") == 0 {
-                    parts := strings.Split(strings.TrimRight(trim, " ")," ")
+                    parts := strings.Split(trim," ")
                     cs <- ServerInfo{"worldup", parts[len(parts)-1]}
                 }
 			}
@@ -642,7 +642,7 @@ func cli() {
 		fmt.Print("> ")
 		reader := bufio.NewReader(os.Stdin)
 		raw_input, _ := reader.ReadString('\n')
-		trimmed := strings.TrimRight(raw_input, "\n")
+		trimmed := strings.Trim(raw_input, "\n \r")
 		parts := strings.Split(trimmed, " ")
 		command := parts[0]
 		resp := processCommand(command, parts[1:], nil)
