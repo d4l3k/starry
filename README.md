@@ -15,11 +15,12 @@ Features
 * `/command` commands. The syntax is mostly the same as the CLI but you need to put the server password as the first argument for most commands. Eg. `/ban Password1 Billy`. See `/help` for more information.
 * Give players items.
 * Admin chat highlighting.
+* Server MOTD
 
 Pretty Pictures
 ------
-Join/Leave messages and admin chat highlighting:
-![Join Messages](http://i.imgur.com/rlnzsoV.png)
+Join/Leave messages, MOTD and admin chat highlighting:
+![Join Messages](http://i.imgur.com/77nJAAI.png)
 
 Ingame commands:
 ![Ingame](http://i.imgur.com/xq3lZK6.png)
@@ -54,6 +55,10 @@ General:
     Change your character's name. In game only.
   item <name> <item> <count>
     Give items to a player
+  motd 
+    View the MOTD
+  setmotd <message>
+    Sets the MOTD
 Bans:
   bans 
     Show ban list.
@@ -103,6 +108,7 @@ LogFile: This is the path to the log file location. If you leave this blank it w
 ServerAddress: Address that the Starbound server can be connected to at. 
 ProxyAddress: The address that Starry binds to. This should probably be left as is.
 Password: A password for remote admin access.
+MOTD: A message to display to users upon connection. Leave blank to disable.
 Admins: A list of admins. Can be added to using 'addadmin' and 'deladmin'. The only thing "admin" status gives you is green text in chat.
 Bans: Leave this as is unless you know what you are doing. This is used by Starry to save the bans.
 ```

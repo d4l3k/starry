@@ -96,6 +96,9 @@ func (connection Client) Message(sender, message string, color byte) {
 		sender = ""
 	}
 }
+func (client Client) MOTD(){
+    client.Message("", "MOTD: "+motd, 0x00)
+}
 func (connection Client) Console(message string) {
     connection.Message("", message, 0x04)
 }
@@ -468,7 +471,19 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 			count, _ = strconv.Atoi(args[0])
 		}
 		response = append(response, printMessages(count)...)
-	} else {
+	} else if command == "setmotd" {
+        if len(args) > 1 {
+            motd = strings.Join(args, " ")
+            broadcast("MOTD: "+motd, 0x00)
+            response = append(response, "MOTD: "+motd)
+            writeConfig()
+        } else {
+			response = append(response, "Invalid syntax.")
+			response = append(response, printWTF())
+        }
+    } else if command == "motd" {
+        response = append(response, "MOTD: "+motd)
+    } else {
 		if len(command) > 0 {
 			response = append(response, "Unknown command: "+command)
 		}
@@ -559,15 +574,17 @@ type Config struct {
 	ServerAddress string
 	ProxyAddress  string
 	Password      string
+    MOTD          string
     Admins        []string
 	Bans          []Ban
 }
 
 var admins []string = []string{}
+var motd string = "Welcome to Starry!"
 var password string = "changethis"
 
 func writeConfig() {
-	config := Config{serverPath, logFile, serverAddress, proxyAddress, password, admins, bans}
+	config := Config{serverPath, logFile, serverAddress, proxyAddress, password, motd, admins, bans}
 	b, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		fmt.Println("[Error] Failed to create JSON config.")
@@ -590,6 +607,7 @@ func readConfig() {
 			serverAddress = config.ServerAddress
 			proxyAddress = config.ProxyAddress
 			password = config.Password
+            motd = config.MOTD
 			bans = config.Bans
 		}
 	}
@@ -605,6 +623,8 @@ func main() {
 		Command{"log", "[<count>]", "Last <count> or 20 log messages.", "General", true},
 		Command{"nick", "<name>", "Change your character's name. In game only.", "General", false},
 		Command{"item", "<name> <item> <count>", "Give items to a player", "General", true},
+		Command{"motd", "", "View the MOTD", "General", false},
+		Command{"setmotd", "<message>", "Sets the MOTD", "General", true},
 		Command{"bans", "", "Show ban list.", "Bans", true},
 		Command{"ban", "<name>", "Ban an IP by player name.", "Bans", true},
 		Command{"banip", "<ip> [<name>]", "Ban an IP or range (eg. 8.8.8.).", "Bans", true},
@@ -647,6 +667,7 @@ func main() {
 								connections[i].Name = name
 								connections[i].Id = id
 								fmt.Println("[Client]", connections[i])
+                                connections[i].MOTD()
 								broadcast(connections[i].Name + " has joined.", 0x02)
 							}
 						}
