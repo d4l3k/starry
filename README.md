@@ -85,11 +85,11 @@ Pretty Pictures
 Join/Leave messages and chatting from console:
 ![Join Messages](http://i.imgur.com/2TFCuEv.png)
 
-Interactice CLI:
-![CLI](http://i.imgur.com/ZKP9OHM.png)
-
 Ingame commands:
 ![Ingame](http://i.imgur.com/OJ9fEye.png)
+
+Interactice CLI (old pic):
+![CLI](http://i.imgur.com/ZKP9OHM.png)
 
 License
 -----
