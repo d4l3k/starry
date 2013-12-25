@@ -13,6 +13,7 @@ Features
 * Server restart on crash
 * Works on Linux and Windows (not tested)
 * `/command` commands. The syntax is mostly the same as the CLI but you need to put the server password as the first argument for most commands. Eg. `/ban Password1 Billy`. See `/help` for more information.
+* Give players items.
 
 Commands
 -----
@@ -32,8 +33,10 @@ General:
     Information on commands.
   log [<count>]
     Last <count> or 20 log messages.
-  nick <name
+  nick <name>
     Change your character's name. In game only.
+  item <name> <item> <count>
+    Give items to a player
 Bans:
   bans 
     Show ban list.
@@ -87,6 +90,9 @@ Join/Leave messages and chatting from console:
 
 Ingame commands:
 ![Ingame](http://i.imgur.com/OJ9fEye.png)
+
+Giving Items:
+![Item](http://i.imgur.com/mCAWxE8.png)
 
 Interactice CLI (old pic):
 ![CLI](http://i.imgur.com/ZKP9OHM.png)

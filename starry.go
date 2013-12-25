@@ -66,6 +66,25 @@ func genMsg(sender, msg string) []byte {
     encoded = append(encoded, []byte{0x30, 0x04, 0x98, 0x6d, 0x2b, 0x0c, 0x60, 0x04, 0x02, 0x8d, 0xc2, 0x51}...)
     return encoded
 }
+func (connection Client) GiveItem(item string, count int){
+    length := len(item) + 4
+    encoded := []byte{0x14, byte(length * 2)}
+    encoded = append(encoded, byte(len(item)))
+    encoded = append(encoded, []byte(item)...)
+    encoded = append(encoded, byte( count +1 ))
+    encoded = append(encoded, []byte{0x07, 0x00, 0x30, 0x06, 0x83, 0xb7, 0x74, 0x2b, 0x1e, 0x81, 0x1e, 0x0c, 0x02, 0x8d, 0xcb, 0x04, 0x04, 0x8b, 0xa3, 0x4e, 0x08, 0x88, 0x80, 0x01}...)
+    connection.Conn.Write(encoded)
+}
+func giveItem(name, item string, count int) (lines []string) {
+	for i := 0; i < len(connections); i++ {
+		conn := connections[i]
+	    if conn.Name == name {
+            lines = append(lines, "Giving "+strconv.Itoa(count)+" "+item+" to "+conn.Name+".")
+            conn.GiveItem(item, count)
+        }
+    }
+    return
+}
 func (connection Client) Console(message string) {
 	sender := ""
 	for len(message) > 0 {
@@ -387,7 +406,15 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 			response = append(response, "Invalid syntax.")
 			response = append(response, printWTF())
 		}
-	} else if command == "say" {
+	} else if command == "item" {
+        if len(args) == 3 {
+            count, _ := strconv.Atoi( args[2] )
+            response = append(response, giveItem(args[0], args[1], count )...)
+        } else {
+			response = append(response, "Invalid syntax.")
+			response = append(response, printWTF())
+        }
+    } else if command == "say" {
 		message := strings.Join(args[1:], " ")
 		say(args[0], message)
 	} else if command == "broadcast" {
@@ -537,7 +564,8 @@ func main() {
 		Command{"broadcast", "<message>", "Show grey text in chat.", "General", true},
 		Command{"help", "[<command>]", "Information on commands.", "General", false},
 		Command{"log", "[<count>]", "Last <count> or 20 log messages.", "General", true},
-		Command{"nick", "<name", "Change your character's name. In game only.", "General", false},
+		Command{"nick", "<name>", "Change your character's name. In game only.", "General", false},
+		Command{"item", "<name> <item> <count>", "Give items to a player", "General", true},
 		Command{"bans", "", "Show ban list.", "Bans", true},
 		Command{"ban", "<name>", "Ban an IP by player name.", "Bans", true},
 		Command{"banip", "<ip> [<name>]", "Ban an IP or range (eg. 8.8.8.).", "Bans", true},
