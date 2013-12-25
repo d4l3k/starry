@@ -715,8 +715,10 @@ type Config struct {
 	ProxyAddress  string
 	Password      string
     MOTD          string
+    FirstConnectItems map[string]int
     Admins        []User
 	Bans          []Ban
+    Remembered    []string
 }
 type User struct {
     Name, Uuid string
@@ -740,7 +742,7 @@ func writeConfig() {
 func readConfig() {
 	lines, err := util.ReadLines("starry.config")
 	if err != nil {
-		fmt.Println("[Error]", err)
+		fmt.Println("[Error Reading Config]", err)
 		writeConfig()
 	} else {
 		err := json.Unmarshal([]byte(strings.Join(lines, "\n")), &config)
@@ -753,8 +755,10 @@ func readConfig() {
                 "0.0.0.0:21025",
                 "changethis",
                 "Welcome to Starry!",
+                make(map[string]int),
                 []User{},
                 []Ban{},
+                []string{},
             }
 		} else {
 			/*serverPath = config.ServerPath
@@ -771,6 +775,19 @@ func readConfig() {
 func (client Client) delayWelcome() {
     time.Sleep(time.Second)
     client.MOTD()
+    found := false
+    for i:=0;i<len(config.Remembered);i++ {
+        if config.Remembered[i]==client.Uuid {
+            found = true
+        }
+    }
+    if !found {
+        for k, v := range config.FirstConnectItems {
+            client.GiveItem(k, v)
+        }
+        config.Remembered = append(config.Remembered, client.Uuid)
+        writeConfig()
+    }
 }
 
 func main() {
