@@ -1,7 +1,9 @@
 Starry
 ======
 
-A starbound server manager that adds ingame commands, banning and a couple of other features.
+A starbound server manager that adds ingame commands, item giving, banning and a couple of other features.
+
+Source is on GitHub: https://github.com/d4l3k/starry
 
 Features
 -----

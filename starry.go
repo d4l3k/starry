@@ -13,14 +13,14 @@ import (
 	"strings"
 	"time"
     "bytes"
+    "compress/zlib"
+    "encoding/hex"
 )
 
-var serverAddress string = "localhost:21024"
-var proxyAddress string = "0.0.0.0:21025"
 
 type Client struct {
 	Name                  string
-	Id                    int
+	Uuid                  string
 	RemoteAddr, LocalAddr net.Addr
 	Conn, ProxyConn       net.Conn
 }
@@ -97,7 +97,7 @@ func (connection Client) Message(sender, message string, color byte) {
 	}
 }
 func (client Client) MOTD(){
-    client.Message("", "MOTD: "+motd, 0x00)
+    client.Message("", "MOTD: "+config.MOTD, 0x00)
 }
 func (connection Client) Console(message string) {
     connection.Message("", message, 0x04)
@@ -123,8 +123,8 @@ func filterConn(dst, src net.Conn) (written int64, err error){
             if buf[0]==0x05 && buf[2]==0x01 {
                 length := buf[8]
                 name := string(buf[9:9+length])
-                for i:=0;i<len(admins);i++ {
-                    if admins[i] == name {
+                for i:=0;i<len(config.Admins);i++ {
+                    if config.Admins[i].Name == name {
                         buf[2]=0x00
                     }
                 }
@@ -152,13 +152,130 @@ func filterConn(dst, src net.Conn) (written int64, err error){
     }
     return
 }
+func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err error){
+    buf := make([]byte, 32*1024)
+
+    /*parts := strings.Split(info.Data, " ")
+    op := parts[len(parts)-1]
+    if op == "connected" {
+        path := parts[len(parts)-2]
+        path = path[1 : len(path)-1]
+        id_str := parts[len(parts)-3]
+        id_str = id_str[1 : len(id_str)-1]
+        id, _ := strconv.Atoi(id_str)
+        name := strings.Join(parts[2:len(parts)-3], " ")
+        name = name[1 : len(name)-1]
+        //fmt.Println("Path", path, "Name", name)
+        for i := 0; i < len(connections); i++ {
+            addr := connections[i].LocalAddr.String()
+            //fmt.Println("NPath:", addr, "Path:", path, addr == path)
+            if addr == path {
+                connections[i].Name = name
+                connections[i].Id = id
+                fmt.Println("[Client]", connections[i])
+                connections[i].MOTD()
+                broadcast(connections[i].Name + " has joined.", 0x02)
+            }
+        }
+    } else if op == "disconnected" {
+        id_str := parts[len(parts)-3]
+        id_str = id_str[1 : len(id_str)-1]
+        id, _ := strconv.Atoi(id_str)
+        for i := 0; i < len(connections); i++ {
+            if connections[i].Id == id {
+                broadcast(connections[i].Name + " has left.", 0x02)
+                connections = append(connections[:i], connections[i+1:]...)
+                break
+            }
+        }
+
+    }*/
+    first := true
+    var client Client
+    for {
+        nr, er := src.Read(buf)
+        if nr > 0 {
+            if first {
+                fmt.Println("First length:",nr, buf[0:20])
+                length := byte(0)
+                cur := byte(0)
+                i := 1
+                for i=1; (cur & 0x80) != 0 || i==1; i++ {
+                    cur = buf[i] & 0xff
+                    length = length << 7 | (cur & 0x7f)
+                    fmt.Println("L",length)
+                }
+                fmt.Println("Length",length)
+                comp := bytes.NewBuffer(buf[i:])
+                r, err := zlib.NewReader(comp)
+                if err!=nil {
+                    fmt.Println("Err:",err)
+                }
+                uncomp := make([]byte,32*1024)
+                r.Read(uncomp)
+                r.Close()
+                asset_digest := uncomp[1:uncomp[0]+1]
+                index := uncomp[0]+1
+                claim := uncomp[index]
+                index += 1
+                unk := uncomp[index]
+                index += 1
+                uuid := hex.EncodeToString(uncomp[index:index+16])
+                fmt.Println("UUID", uuid)
+                fmt.Println("Uncomp",uncomp[index+16:150])
+                index += 16
+                _ = asset_digest
+                _ = claim
+                _ = unk
+                index += 1
+                name := string(uncomp[index:index+uncomp[index-1]])
+                fmt.Println("Name",name)
+                client = Client{name, uuid, src.RemoteAddr(), dst.LocalAddr(), src, dst}
+                //client.MOTD()
+                fmt.Println("[Client]", client)
+                //broadcast(client.Name + " has joined.", 0x02)
+                clients <- client
+                first = false
+            }
+            nw, ew := dst.Write(buf[0:nr])
+            if nw > 0 {
+                written += int64(nw)
+            }
+            if ew != nil {
+                err = ew
+                break
+            }
+            if nr != nw {
+                err = io.ErrShortWrite
+                break
+            }
+        }
+        if er == io.EOF {
+            break
+        }
+        if er != nil {
+            err = er
+            break
+        }
+    }
+    broadcast(client.Name + " has left.", 0x02)
+    for i := 0; i < len(connections); i++ {
+        if connections[i] == client {
+            broadcast(connections[i].Name + " has left.", 0x02)
+            connections = append(connections[:i], connections[i+1:]...)
+            break
+        }
+    }
+    dst.Close()
+    return
+}
 func netProxy(connections chan Client) {
-	tcpAddr, err := net.ResolveTCPAddr("tcp", proxyAddress)
+	tcpAddr, err := net.ResolveTCPAddr("tcp", config.ProxyAddress)
 	checkError(err)
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	checkError(err)
 
-	rAddr, err := net.ResolveTCPAddr("tcp", serverAddress)
+	rAddr, err := net.ResolveTCPAddr("tcp", config.ServerAddress)
 	if err != nil {
 		panic(err)
 	}
@@ -181,9 +298,8 @@ func netProxy(connections chan Client) {
 				conn.Close()
 			} else {
 				fmt.Println("Remote addr:", rConn.LocalAddr())
-				connections <- Client{"Unknown", -1, conn.RemoteAddr(), rConn.LocalAddr(), conn, rConn}
 				go filterConn(conn, rConn)
-				go io.Copy(rConn, conn)
+				go filterConnCS(rConn, conn, connections)
                 //go io.Copy(rConn, conn)
 				defer rConn.Close()
 			}
@@ -196,11 +312,10 @@ type ServerInfo struct {
 	Type, Data string
 }
 
-var serverPath string = "/home/rice/.starbound/linux64/starbound_server"
 
 func monitorServer(cs chan ServerInfo) {
 	for {
-		cmd := exec.Command(serverPath)
+		cmd := exec.Command(config.ServerPath)
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			fmt.Println(err)
@@ -245,7 +360,7 @@ func printMessages(count int) (lines []string) {
 	}
 	path := logFile
 	if len(path) == 0 {
-		path = serverPath
+		path = config.ServerPath
 		if path[len(path)-4:] == ".exe" {
 			path = path[:len(path)-4]
 		}
@@ -284,15 +399,22 @@ func banip(ip, desc string) (lines []string) {
 	writeConfig()
 	return
 }
-func processCommand(command string, args []string, ingame bool) (response []string) {
-	if ingame {
+func processCommand(command string, args []string, client *Client) (response []string) {
+    ingame := client!=nil
+	if client != nil {
 		for i := 0; i < len(commands); i++ {
 			cmd := commands[i]
 			if cmd.Command == command && cmd.Auth {
-				if len(args) > 0 && args[0] == password {
-					args = args[1:]
+                authed := false
+                for i:=0;i<len(config.Admins);i++ {
+                    admin := config.Admins[i]
+                    if admin.Uuid == client.Uuid {
+                        authed = true
+                    }
+                }
+				if authed {
 				} else {
-					response = append(response, "Invalid password.")
+					response = append(response, "Not on admin list.")
 					response = append(response, printWTF())
 					return
 				}
@@ -301,7 +423,7 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 	}
 	if command == "help" {
         if len(args)==0 {
-            response = append(response, genHelp(ingame)...)
+            response = append(response, genHelp(client != nil)...)
         } else {
             for i := 0; i < len(commands); i++ {
                 cmd := commands[i]
@@ -438,26 +560,52 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 		response = append(response, "[Clients]")
 		for i := 0; i < len(connections); i++ {
 			conn := connections[i]
-			response = append(response, "  "+conn.Name+" - ID: "+strconv.Itoa(conn.Id)+", IP: "+conn.RemoteAddr.String())
+			response = append(response, "  "+conn.Name+" - UUID: "+conn.Uuid+", IP: "+conn.RemoteAddr.String())
 		}
+	} else if command == "players" {
+		response = append(response, "[Players]")
+        players := make([]string,0)
+		for i := 0; i < len(connections); i++ {
+			conn := connections[i]
+			players = append(players, conn.Name)
+            //response = append(response, "  "+conn.Name+" - UUID: "+conn.Uuid+", IP: "+conn.RemoteAddr.String())
+		}
+        response = append(response,strings.Join(players,", "))
 	} else if command == "admins" {
 		response = append(response, "[Admins]")
+        admins := make([]string, 0)
+        for i:=0;i<len(config.Admins);i++ {
+            admins = append(admins,config.Admins[i].Name)
+        }
         response = append(response, strings.Join(admins, ", "))
-	} else if command == "addadmin" {
+	} else if command == "adminadd" {
         if len(args) == 1 {
-			response = append(response, "Added "+args[0]+" to the admin list.")
-            admins = append(admins, args[0])
-            writeConfig()
+            var clientt Client
+            found := false
+            for i:=0;i<len(connections);i++ {
+                if connections[i].Name == strings.Join(args, " ") {
+                    found = true
+                    clientt = connections[i]
+                    break
+                }
+            }
+            if found {
+                response = append(response, "Added "+clientt.Name+" to the admin list.")
+                config.Admins = append(config.Admins, User{clientt.Name, clientt.Uuid})
+                writeConfig()
+            } else {
+                response = append(response, "Player not found.")
+            }
         } else {
 			response = append(response, "Invalid syntax.")
 			response = append(response, printWTF())
         }
-    } else if command == "deladmin" {
+    } else if command == "adminrem" {
         if len(args) == 1 {
-            for i:=0; i< len(admins); i++ {
-                if admins[i] == args[0] {
+            for i:=0; i< len(config.Admins); i++ {
+                if config.Admins[i].Name == strings.Join(args, " ") {
                     response = append(response, "Removed "+args[0]+" from the admin list.")
-                    admins = append(admins[:i], admins[(i+1):]...)
+                    config.Admins = append(config.Admins[:i], config.Admins[(i+1):]...)
                     writeConfig()
                 }
             }
@@ -473,16 +621,20 @@ func processCommand(command string, args []string, ingame bool) (response []stri
 		response = append(response, printMessages(count)...)
 	} else if command == "setmotd" {
         if len(args) > 1 {
-            motd = strings.Join(args, " ")
-            broadcast("MOTD: "+motd, 0x00)
-            response = append(response, "MOTD: "+motd)
+            config.MOTD = strings.Join(args, " ")
+            broadcast("MOTD: "+config.MOTD, 0x00)
+            response = append(response, "MOTD: "+config.MOTD)
             writeConfig()
         } else {
 			response = append(response, "Invalid syntax.")
 			response = append(response, printWTF())
         }
     } else if command == "motd" {
-        response = append(response, "MOTD: "+motd)
+        if ingame {
+            client.Message("","MOTD: "+config.MOTD, 0x00)
+        } else {
+            response = append(response, "MOTD: "+config.MOTD)
+        }
     } else {
 		if len(command) > 0 {
 			response = append(response, "Unknown command: "+command)
@@ -502,7 +654,7 @@ func cli() {
 		trimmed := strings.TrimRight(raw_input, "\n")
 		parts := strings.Split(trimmed, " ")
 		command := parts[0]
-		resp := processCommand(command, parts[1:], false)
+		resp := processCommand(command, parts[1:], nil)
 		for i := 0; i < len(resp); i++ {
 			fmt.Println(resp[i])
 		}
@@ -575,16 +727,21 @@ type Config struct {
 	ProxyAddress  string
 	Password      string
     MOTD          string
-    Admins        []string
+    Admins        []User
 	Bans          []Ban
 }
-
-var admins []string = []string{}
-var motd string = "Welcome to Starry!"
-var password string = "changethis"
-
+type User struct {
+    Name, Uuid string
+}
+var config Config
+//var admins []string = []string{}
+//var motd string = "Welcome to Starry!"
+//var password string = "changethis"
+//
+//var serverAddress string = "localhost:21024"
+//var proxyAddress string = "0.0.0.0:21025"
+//var serverPath string = "/home/rice/.starbound/linux64/starbound_server"
 func writeConfig() {
-	config := Config{serverPath, logFile, serverAddress, proxyAddress, password, motd, admins, bans}
 	b, err := json.MarshalIndent(config, "", "    ")
 	if err != nil {
 		fmt.Println("[Error] Failed to create JSON config.")
@@ -597,25 +754,35 @@ func readConfig() {
 		fmt.Println("[Error]", err)
 		writeConfig()
 	} else {
-		var config Config
 		err := json.Unmarshal([]byte(strings.Join(lines, "\n")), &config)
 		if err != nil {
 			fmt.Println("[Error]", err)
+            config = Config{
+                "/home/rice/.starbound/linux64/starbound_server",
+                "",
+                "localhost:21024",
+                "0.0.0.0:21025",
+                "changethis",
+                "Welcome to Starry!",
+                []User{},
+                []Ban{},
+            }
 		} else {
-			serverPath = config.ServerPath
+			/*serverPath = config.ServerPath
 			logFile = config.LogFile
 			serverAddress = config.ServerAddress
 			proxyAddress = config.ProxyAddress
 			password = config.Password
             motd = config.MOTD
-			bans = config.Bans
+			bans = config.Bans*/
 		}
 	}
 }
 
 func main() {
 	commands = []Command{
-		Command{"clients", "", "Display connected clients.", "General", false},
+		Command{"clients", "", "Connected client information (UUID, IP).", "General", true},
+		Command{"players", "", "Show online players", "General", false},
 		Command{"say", "<sender name> <message>", "Say something.", "General", true},
 		Command{"broadcast", "<message>", "Show grey text in chat.", "General", true},
 		Command{"color", "<color> <message>", "Similar to broadcast but with color.", "General", true},
@@ -631,8 +798,8 @@ func main() {
 		Command{"unban", "<name>", "Unban an IP by name.", "Bans", true},
 		Command{"unbanip", "<ip>", "Unban an IP.", "Bans", true},
 		Command{"admins", "", "Lists the admins.", "Admin", true},
-		Command{"addadmin", "<name>", "Adds a player to the admin list.", "Admin", true},
-		Command{"deladmin", "<name>", "Removes a player from the admin list.", "Admin", true},
+		Command{"adminadd", "<name>", "Adds a player to the admin list.", "Admin", true},
+		Command{"adminrem", "<name>", "Removes a player from the admin list.", "Admin", true},
 	}
 	readConfig()
 	clientChan := make(chan Client)
@@ -654,9 +821,6 @@ func main() {
 					if op == "connected" {
 						path := parts[len(parts)-2]
 						path = path[1 : len(path)-1]
-						id_str := parts[len(parts)-3]
-						id_str = id_str[1 : len(id_str)-1]
-						id, _ := strconv.Atoi(id_str)
 						name := strings.Join(parts[2:len(parts)-3], " ")
 						name = name[1 : len(name)-1]
 						//fmt.Println("Path", path, "Name", name)
@@ -664,27 +828,12 @@ func main() {
 							addr := connections[i].LocalAddr.String()
 							//fmt.Println("NPath:", addr, "Path:", path, addr == path)
 							if addr == path {
-								connections[i].Name = name
-								connections[i].Id = id
-								fmt.Println("[Client]", connections[i])
                                 connections[i].MOTD()
 								broadcast(connections[i].Name + " has joined.", 0x02)
 							}
 						}
-					} else if op == "disconnected" {
-						id_str := parts[len(parts)-3]
-						id_str = id_str[1 : len(id_str)-1]
-						id, _ := strconv.Atoi(id_str)
-						for i := 0; i < len(connections); i++ {
-							if connections[i].Id == id {
-								broadcast(connections[i].Name + " has left.", 0x02)
-								connections = append(connections[:i], connections[i+1:]...)
-								break
-							}
-						}
-
 					}
-				} else if info.Type == "serverup" {
+                } else if info.Type == "serverup" {
 					fmt.Println("Server listening for connections.")
 				} else if info.Type == "chat" {
 					parts := strings.Split(info.Data, " ")
@@ -696,14 +845,14 @@ func main() {
 						command := parts[3][1:len(parts[3])]
 						if command == "nick" {
 						} else {
-							resp := processCommand(command, parts[4:], true)
 							for j := 0; j < len(connections); j++ {
 								conn := connections[j]
 								if conn.Name == user {
+                                    resp := processCommand(command, parts[4:], &conn)
 									for i := 0; i < len(resp); i++ {
 										conn.Console(resp[i])
-										//fmt.Println(resp[i])
 									}
+                                    break
 								}
 							}
 						}
