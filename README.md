@@ -20,6 +20,7 @@ Features
 * Server MOTD
 * UUID Admins
 * Loaded world monitoring `worlds`
+* List of "starter" items given on first connect.
 
 Pretty Pictures
 ------
@@ -115,14 +116,16 @@ sudo iptables -A INPUT -p tcp --destination-port 21024 -j DROP
 
 Modify `starry.config` to your prefered values.
 ```
-ServerPath: You should modify "gamePort" in the starbound.config file in the ServerPath folder to be 21024.h to the starbound_server executable.
+ServerPath: This should be the path to the starbound_server executable.
 LogFile: This is the path to the log file location. If you leave this blank it will append ".log" to the ServerPath.
-ServerAddress: Address that the Starbound server can be connected to at. 
+ServerAddress: Address that the Starbound server can be connected to at. You should leave this as is, and modify "gamePort" in the starbound.config file in the ServerPath folder to be 21024.
 ProxyAddress: The address that Starry binds to. This should probably be left as is.
 Password: A password for remote admin access. Not used ATM. Will be used for the web interface.
 MOTD: A message to display to users upon connection. Leave blank to disable.
+FirstConnectItems: A key value pair of starbound items and quantities that will be given on first connect. If the quantity is over ~150 it will give a stack of 1000 (needs to be fixed).
 Admins: A list of admins. Can be added to using 'addadmin' and 'deladmin'.
 Bans: Leave this as is unless you know what you are doing. This is used by Starry to save the bans.
+Remembered: List of remembered players UUIDs. Don't touch.
 ```
 
 To launch it:
