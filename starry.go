@@ -170,14 +170,25 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                     fmt.Println("L",length)
                 }
                 //fmt.Println("Length",length)
-                comp := bytes.NewBuffer(buf[i:])
-                r, err := zlib.NewReader(comp)
-                if err!=nil {
-                    fmt.Println("Err:",err)
+                fmt.Println("First bytes",buf[:80])
+                i = bytes.Index(buf, []byte{0x78,0x9c})
+                fmt.Println("i", i)
+                var uncomp []byte
+                nocomp := false
+                if i != -1 {
+                    comp := bytes.NewBuffer(buf[i:])
+                    r, err := zlib.NewReader(comp)
+                    if err!=nil {
+                        fmt.Println("Err:",err)
+                    }
+                    uncomp = make([]byte,32*1024)
+                    r.Read(uncomp)
+                    r.Close()
+                } else {
+                    nocomp = true
+                    uncomp = buf[bytes.IndexByte(buf,0x80)+1:]
                 }
-                uncomp := make([]byte,32*1024)
-                r.Read(uncomp)
-                r.Close()
+
                 asset_digest := uncomp[1:uncomp[0]+1]
                 index := uncomp[0]+1
                 claim := uncomp[index]
@@ -191,7 +202,9 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                 _ = asset_digest
                 _ = claim
                 _ = unk
-                index += 1
+                if !nocomp {
+                    index += 1
+                }
                 name := string(uncomp[index:index+uncomp[index-1]])
                 //fmt.Println("Name",name)
                 client = Client{name, uuid, src.RemoteAddr(), dst.LocalAddr(), src, dst}
