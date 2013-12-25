@@ -3,7 +3,7 @@ Starry
 
 A starbound server manager that adds ingame commands, item giving, banning and a couple of other features.
 
-Source is on GitHub: https://github.com/d4l3k/starry
+Source is on GitHub and has the most upto date information: https://github.com/d4l3k/starry
 
 Features
 -----
@@ -23,15 +23,19 @@ Features
 Pretty Pictures
 ------
 Join/Leave messages, MOTD and admin chat highlighting:
+
 ![Join Messages](http://i.imgur.com/77nJAAI.png)
 
 Ingame commands:
+
 ![Ingame](http://i.imgur.com/xq3lZK6.png)
 
 Giving Items:
+
 ![Item](http://i.imgur.com/mCAWxE8.png)
 
 Interactice CLI (old pic):
+
 ![CLI](http://i.imgur.com/ZKP9OHM.png)
 
 Commands
