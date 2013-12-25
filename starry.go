@@ -570,7 +570,7 @@ func processCommand(command string, args []string, client *Client) (response []s
         }
         response = append(response, strings.Join(admins, ", "))
 	} else if command == "adminadd" {
-        if len(args) == 1 {
+        if len(args) > 0 {
             var clientt Client
             found := false
             for i:=0;i<len(connections);i++ {
@@ -592,7 +592,7 @@ func processCommand(command string, args []string, client *Client) (response []s
 			response = append(response, printWTF())
         }
     } else if command == "adminrem" {
-        if len(args) == 1 {
+        if len(args) > 0 {
             for i:=0; i< len(config.Admins); i++ {
                 if config.Admins[i].Name == strings.Join(args, " ") {
                     response = append(response, "Removed "+args[0]+" from the admin list.")
@@ -826,19 +826,20 @@ func main() {
                 } else if info.Type == "serverup" {
 					fmt.Println("Server listening for connections.")
 				} else if info.Type == "chat" {
-					parts := strings.Split(info.Data, " ")
-					user := parts[2]
-					user = user[1 : len(user)-1]
-					message := strings.Join(parts[3:], " ")
+					name_start := strings.Index(info.Data,"<")
+                    name_end := strings.Index(info.Data,">")
+                    user := info.Data[name_start+1:name_end]
+					parts := strings.Split(info.Data[name_end+2:], " ")
+					message := strings.Join(parts, " ")
 					fmt.Println("<" + user + "> " + message)
 					if string(message[0]) == "/" {
-						command := parts[3][1:len(parts[3])]
+						command := parts[0][1:len(parts[0])]
 						if command == "nick" {
 						} else {
 							for j := 0; j < len(connections); j++ {
 								conn := connections[j]
 								if conn.Name == user {
-                                    resp := processCommand(command, parts[4:], &conn)
+                                    resp := processCommand(command, parts[1:], &conn)
 									for i := 0; i < len(resp); i++ {
 										conn.Console(resp[i])
 									}
