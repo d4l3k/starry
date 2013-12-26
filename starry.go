@@ -15,6 +15,7 @@ import (
     "bytes"
     "compress/zlib"
     "encoding/hex"
+//    "encoding/binary"
 )
 
 
@@ -74,8 +75,11 @@ Colors:
     All others - Light gray
 */
 func (connection Client) Message(sender, message string, color byte) {
+    if len(sender)>30 {
+        sender = sender[0:30]
+    }
 	for len(message) > 0 {
-		end := 55 - len(sender)
+		end := 50 - len(sender)
 		if len(message) < end {
 			end = len(message)
 		}
@@ -84,6 +88,9 @@ func (connection Client) Message(sender, message string, color byte) {
 			message = message[end:]
 		}
 		length := len(sender) + len(n_message) + 8
+/*        buf := make([]byte, binary.MaxVarintLen64)
+        v := buf[:binary.PutVarint(buf, int64(length))]
+        fmt.Println("Bytesss",v,byte(length*2))*/
 		// Normal text (what looks like a player)
 		//encoded := []byte{0x05, byte(length * 2), 0x01, 0x00, 0x00, 0x00, 0x00, 0x02}
 		encoded := []byte{0x05, byte(length * 2), color, 0x00, 0x00, 0x00, 0x00, 0x00}
@@ -114,18 +121,28 @@ func filterConn(dst, src net.Conn) (written int64, err error){
         nr, er := src.Read(buf)
         if nr > 0 {
             // Drops the "No command found" response message from starbound_server
-            if buf[0]==0x05 && buf[2]==0x03 && bytes.Index(buf,[]byte("No such command"))!=-1 {
+            if buf[0]==0x05 && ( buf[2]==0x03 && buf[3]==0x00 || buf[3]==0x03 && buf[4]==0x00) && bytes.Index(buf,[]byte("No such command"))!=-1 {
                 length := 16 + int(buf[15])
                 buf = buf[length:]
                 nr -= length
             }
             // Admin chat highlighting
-            if buf[0]==0x05 && buf[2]==0x01 {
-                length := buf[8]
-                name := string(buf[9:9+length])
+            first_bit := buf[2]==0x01 && buf[3]==0x00
+            second_bit := buf[3]==0x01 && buf[4]==0x00
+            if buf[0]==0x05 && (first_bit || second_bit) {
+                index := 8
+                if second_bit {
+                    index = 9
+                }
+                length := buf[index]
+                name := string(buf[index+1:index+1+int(length)])
                 for i:=0;i<len(config.Admins);i++ {
                     if config.Admins[i].Name == name {
-                        buf[2]=0x00
+                        if first_bit {
+                            buf[2]=0x00
+                        } else {
+                            buf[3]=0x00
+                        }
                     }
                 }
             }
@@ -150,6 +167,7 @@ func filterConn(dst, src net.Conn) (written int64, err error){
             break
         }
     }
+    fmt.Println("[Conn Drop Err]",err)
     return
 }
 func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err error){
@@ -167,10 +185,10 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                 for i=1; (cur & 0x80) != 0 || i==1; i++ {
                     cur = buf[i] & 0xff
                     length = length << 7 | (cur & 0x7f)
-                    fmt.Println("L",length)
+                    //fmt.Println("L",length)
                 }
                 //fmt.Println("Length",length)
-                fmt.Println("First bytes",buf[:80])
+                //fmt.Println("First bytes",buf[:80])
                 i = bytes.Index(buf, []byte{0x78,0x9c})
                 fmt.Println("i", i)
                 var uncomp []byte
@@ -187,6 +205,7 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                 } else {
                     nocomp = true
                     uncomp = buf[bytes.IndexByte(buf,0x80)+1:]
+                    fmt.Println("[Error] Player hasn't first logged into a singleplayer world. No shipdata.")
                 }
 
                 asset_digest := uncomp[1:uncomp[0]+1]
@@ -210,7 +229,9 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
                 client = Client{name, uuid, src.RemoteAddr(), dst.LocalAddr(), src, dst}
                 //client.MOTD()
                 fmt.Println("[Client]", client)
-                //broadcast(client.Name + " has joined.", 0x02)
+                if nocomp {
+                    fmt.Println("[Error] "+client.Name+" hasn't first logged into a singleplayer world. No shipdata.")
+                }
                 clients <- client
                 first = false
             }
@@ -235,14 +256,15 @@ func filterConnCS(dst, src net.Conn, clients chan Client) (written int64, err er
             break
         }
     }
-    broadcast(client.Name + " has left.", 0x02)
     for i := 0; i < len(connections); i++ {
         if connections[i] == client {
             connections = append(connections[:i], connections[i+1:]...)
             break
         }
     }
+    fmt.Println("[Conn Drop Err]",err)
     dst.Close()
+    broadcast(client.Name + " has left.", 0x02)
     return
 }
 func netProxy(connections chan Client) {
@@ -259,8 +281,8 @@ func netProxy(connections chan Client) {
 		conn, _ := listener.Accept()
 		//fmt.Println("Server listerning")
 		banned := false
-		for i := 0; i < len(bans); i++ {
-			ban := bans[i]
+		for i := 0; i < len(config.Bans); i++ {
+			ban := config.Bans[i]
 			if strings.Index(conn.RemoteAddr().String(), ban.Addr) != -1 {
 				fmt.Println("[Info] Banned client tried to connect from IP:", conn.RemoteAddr().String(), "Matched Rule Name:", ban.Name, "Rule IP:", ban.Addr)
 				banned = true
@@ -366,7 +388,7 @@ func printMessages(count int) (lines []string) {
 }
 func banip(ip, desc string) (lines []string) {
 	lines = append(lines, "[Banned] ip: "+ip+" Desc: "+desc)
-	bans = append(bans, Ban{ip, desc})
+	config.Bans = append(config.Bans, Ban{ip, desc})
 	for i := 0; i < len(connections); i++ {
 		conn := connections[i]
 		addr_bits := strings.Split(conn.RemoteAddr.String(), ":")
@@ -436,8 +458,8 @@ func processCommand(command string, args []string, client *Client) (response []s
         }
     } else if command == "bans" {
 		response = append(response, "[Bans]")
-		for i := 0; i < len(bans); i++ {
-			conn := bans[i]
+		for i := 0; i < len(config.Bans); i++ {
+			conn := config.Bans[i]
 			response = append(response, "  Name: "+conn.Name+", IP: "+conn.Addr)
 		}
 	} else if command == "banip" {
@@ -453,15 +475,15 @@ func processCommand(command string, args []string, client *Client) (response []s
 		}
 	} else if command == "unbanip" {
 		if len(args) > 0 {
-			//bans = append(bans, Ban{parts[1],"None"})
-			for i := 0; i < len(bans); i++ {
-				if bans[i].Addr == args[0] {
-					conn := bans[i]
+			//config.Bans = append(config.Bans, Ban{parts[1],"None"})
+			for i := 0; i < len(config.Bans); i++ {
+				if config.Bans[i].Addr == args[0] {
+					conn := config.Bans[i]
 					response = append(response, "[Unbanned] Name: ", conn.Name+", IP: "+conn.Addr)
-					bans = append(bans[:i], bans[i+1:]...)
+					config.Bans = append(config.Bans[:i], config.Bans[i+1:]...)
 					writeConfig()
-				} else if strings.Index(bans[i].Addr, args[0]) != -1 {
-					response = append(response, "Did you mean: "+bans[i].Name+" instead? (IP: "+bans[i].Addr+")")
+				} else if strings.Index(config.Bans[i].Addr, args[0]) != -1 {
+					response = append(response, "Did you mean: "+config.Bans[i].Name+" instead? (IP: "+config.Bans[i].Addr+")")
 				}
 			}
 		} else {
@@ -477,7 +499,7 @@ func processCommand(command string, args []string, client *Client) (response []s
 				addr := strings.Join(addr_bits[:len(addr_bits)-1], ":")
 				if conn.Name == name {
 					response = append(response, "[Banned] Name: "+conn.Name+", IP: "+addr)
-					bans = append(bans, Ban{addr, conn.Name})
+					config.Bans = append(config.Bans, Ban{addr, conn.Name})
 					broadcast(conn.Name + " has been banned.", 0x02)
 					conn.Conn.Close()
 					conn.ProxyConn.Close()
@@ -492,13 +514,13 @@ func processCommand(command string, args []string, client *Client) (response []s
 		}
 	} else if command == "unban" {
 		if len(args) > 0 {
-			//bans = append(bans, Ban{parts[1],"None"})
+			//config.Bans = append(config.Bans, Ban{parts[1],"None"})
 			name := strings.Join(args, " ")
-			for i := 0; i < len(bans); i++ {
-				if strings.Index(bans[i].Name, name) != -1 {
-					conn := bans[i]
+			for i := 0; i < len(config.Bans); i++ {
+				if strings.Index(config.Bans[i].Name, name) != -1 {
+					conn := config.Bans[i]
 					response = append(response, "[Unbanned] Name: "+conn.Name+", IP:"+conn.Addr)
-					bans = append(bans[:i], bans[i+1:]...)
+					config.Bans = append(config.Bans[:i], config.Bans[i+1:]...)
 					writeConfig()
 					break
 				}
@@ -509,7 +531,7 @@ func processCommand(command string, args []string, client *Client) (response []s
 		}
 	} else if command == "kick" {
 		if len(args) > 0 {
-			//bans = append(bans, Ban{parts[1],"None"})
+			//config.Bans = append(config.Bans, Ban{parts[1],"None"})
 			name := strings.Join(args, " ")
 			for i := 0; i < len(connections); i++ {
 				conn := connections[i]
@@ -703,7 +725,6 @@ type Ban struct {
 	Addr, Name string
 }
 
-var bans []Ban
 var connections []Client
 
 var logFile string
