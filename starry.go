@@ -551,9 +551,13 @@ func processCommand(command string, args []string, client *Client) (response []s
 			response = append(response, printWTF())
 		}
 	} else if command == "item" {
-        if len(args) == 3 {
-            count, _ := strconv.Atoi( args[2] )
-            response = append(response, giveItem(args[0], args[1], count )...)
+        len := len(args)
+        if len >= 3 {
+            count, _ := strconv.Atoi( args[len-1] )
+            item := args[len-2]
+            nick := strings.Join(args[0:len-2], " ")
+            fmt.Println(nick, item, count)
+            response = append(response, giveItem(nick, item, count )...)
         } else {
 			response = append(response, "Invalid syntax.")
 			response = append(response, printWTF())
